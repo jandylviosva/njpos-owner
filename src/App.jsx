@@ -380,34 +380,55 @@ function Reports({store,data,primary}){
 function Inventory({store,data,session,saveField,primary}){
   const products=data?.products||[];
   const categories=data?.categories||[];
+  const skuSettings=data?.sku_settings||{prefix:"SW",suffix:"",counter:0};
   const [search,setSearch]=useState("");
   const [catFilter,setCat]=useState("All");
-  const [editModal,setEditModal]=useState(null);
+  const [modal,setModal]=useState(null); // null | "add" | "edit"
   const [form,setForm]=useState({});
   const [saving,setSaving]=useState(false);
   const [msg,setMsg]=useState("");
 
-  const filtered=products.filter(p=>(catFilter==="All"||p.category===catFilter)&&(p.name.toLowerCase().includes(search.toLowerCase())||p.sku?.includes(search)));
+  const genNextSKU=()=>{
+    const counter=(skuSettings.counter||0)+1;
+    return `${(skuSettings.prefix||"SW").toUpperCase()}${String(counter).padStart(5,"0")}${(skuSettings.suffix||"").toUpperCase()}`;
+  };
 
-  const openEdit=(p)=>{setForm({...p,price:String(p.price),stock:String(p.stock)});setEditModal(true);setMsg("");};
+  const openAdd=()=>{
+    setForm({id:"p"+uid(),name:"",price:"",category:categories[0]||"Food",stock:0,sku:genNextSKU(),active:true,image:""});
+    setModal("add");setMsg("");
+  };
+  const openEdit=(p)=>{setForm({...p,price:String(p.price),stock:String(p.stock)});setModal("edit");setMsg("");};
 
   const save=async()=>{
+    if(!form.name||!form.price){setMsg("Name and price are required");return;}
     setSaving(true);
-    const updated=products.map(p=>p.id===form.id?{...form,price:parseFloat(form.price)||0,stock:parseInt(form.stock)||0}:p);
+    let updated;
+    if(modal==="add"){
+      updated=[...products,{...form,price:parseFloat(form.price)||0,stock:parseInt(form.stock)||0}];
+      // Also increment SKU counter in sku_settings
+      await saveField("sku_settings",{...skuSettings,counter:(skuSettings.counter||0)+1});
+    } else {
+      updated=products.map(p=>p.id===form.id?{...form,price:parseFloat(form.price)||0,stock:parseInt(form.stock)||0}:p);
+    }
     const ok=await saveField("products",updated);
     setSaving(false);setMsg(ok?"Saved!":"Failed to save.");
-    if(ok)setTimeout(()=>{setEditModal(null);setMsg("");},800);
+    if(ok)setTimeout(()=>{setModal(null);setMsg("");},700);
   };
+
+  const filtered=products.filter(p=>(catFilter==="All"||p.category===catFilter)&&(p.name.toLowerCase().includes(search.toLowerCase())||p.sku?.includes(search)));
 
   return(
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
         <div style={{fontWeight:800,fontSize:18}}>Inventory <span style={{fontSize:13,fontWeight:600,color:"#9ca3af"}}>({products.filter(p=>p.active).length} active)</span></div>
-        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search products…" style={{...INP,width:220,padding:"7px 12px"}}/>
+        <div style={{display:"flex",gap:8}}>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search products…" style={{...INP,width:200,padding:"7px 12px"}}/>
+          <button onClick={openAdd} style={{padding:"7px 14px",background:primary||"#4f46e5",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}}><i className="ti ti-plus"/>Add Product</button>
+        </div>
       </div>
       {/* Category filters */}
       <div style={{display:"flex",gap:5,marginBottom:14,flexWrap:"wrap"}}>
-        {["All",...categories].map(c=><button key={c} onClick={()=>setCat(c)} style={{padding:"3px 12px",borderRadius:20,border:"1.5px solid",cursor:"pointer",fontSize:12,fontWeight:700,borderColor:catFilter===c?primary:"#e5e7eb",background:catFilter===c?primary:"#fff",color:catFilter===c?"#fff":"#6b7280"}}>{c}</button>)}
+        {["All",...categories].map(c=><button key={c} onClick={()=>setCat(c)} style={{padding:"3px 12px",borderRadius:20,border:"1.5px solid",cursor:"pointer",fontSize:12,fontWeight:700,borderColor:catFilter===c?(primary||"#4f46e5"):"#e5e7eb",background:catFilter===c?(primary||"#4f46e5"):"#fff",color:catFilter===c?"#fff":"#6b7280"}}>{c}</button>)}
       </div>
       <Card style={{padding:0,overflow:"hidden"}}>
         <div style={{overflowX:"auto"}}>
@@ -418,7 +439,7 @@ function Inventory({store,data,session,saveField,primary}){
                 <tr key={p.id} style={{borderBottom:"1px solid #f3f4f6",opacity:p.active?1:0.5}}>
                   <td style={{padding:"10px 14px",fontWeight:700}}>{p.name}</td>
                   <td style={{padding:"10px 14px",color:"#6b7280"}}>{p.category}</td>
-                  <td style={{padding:"10px 14px",fontWeight:800,color:primary}}>{fmt(p.price)}</td>
+                  <td style={{padding:"10px 14px",fontWeight:800,color:primary||"#4f46e5"}}>{fmt(p.price)}</td>
                   <td style={{padding:"10px 14px"}}><span style={{fontWeight:800,color:p.stock<=0?"#ef4444":p.stock<=5?"#f59e0b":"#111"}}>{p.stock}</span></td>
                   <td style={{padding:"10px 14px",fontFamily:"monospace",fontSize:11,color:"#9ca3af"}}>{p.sku||"—"}</td>
                   <td style={{padding:"10px 14px"}}><span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10,background:p.active?"#f0fdf4":"#fef2f2",color:p.active?"#166534":"#991b1b"}}>{p.active?"Active":"Hidden"}</span></td>
@@ -430,23 +451,36 @@ function Inventory({store,data,session,saveField,primary}){
           </table>
         </div>
       </Card>
-      {editModal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:500,padding:16}} onClick={e=>e.target===e.currentTarget&&setEditModal(null)}>
-          <div style={{background:"#fff",borderRadius:14,padding:24,width:"100%",maxWidth:380}}>
-            <div style={{fontWeight:800,fontSize:16,marginBottom:16}}>Edit Product</div>
+
+      {/* Add / Edit Modal */}
+      {modal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:500,padding:16}} onClick={e=>e.target===e.currentTarget&&setModal(null)}>
+          <div style={{background:"#fff",borderRadius:14,padding:24,width:"100%",maxWidth:400,maxHeight:"90vh",overflowY:"auto"}}>
+            <div style={{fontWeight:800,fontSize:16,marginBottom:16}}>{modal==="add"?"Add Product":"Edit Product"}</div>
             <div style={{display:"flex",flexDirection:"column",gap:12}}>
-              <FRow label="Name"><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} style={INP}/></FRow>
+              <FRow label="Product Name"><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="e.g. Chicken Adobo" style={INP} autoFocus/></FRow>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                <FRow label="Price (₱)"><input type="number" value={form.price} onChange={e=>setForm(f=>({...f,price:e.target.value}))} style={INP}/></FRow>
-                <FRow label="Stock"><input type="number" value={form.stock} onChange={e=>setForm(f=>({...f,stock:e.target.value}))} style={INP}/></FRow>
+                <FRow label="Price (₱)"><input type="number" value={form.price} onChange={e=>setForm(f=>({...f,price:e.target.value}))} placeholder="0.00" style={INP}/></FRow>
+                <FRow label="Stock"><input type="number" value={form.stock} onChange={e=>setForm(f=>({...f,stock:e.target.value}))} placeholder="0" style={INP}/></FRow>
               </div>
-              <FRow label="Category"><input value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} style={INP}/></FRow>
-              <FRow label="Status"><select value={form.active?"active":"hidden"} onChange={e=>setForm(f=>({...f,active:e.target.value==="active"}))} style={INP}><option value="active">Active</option><option value="hidden">Hidden</option></select></FRow>
+              <FRow label="Category">
+                <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} style={INP}>
+                  {categories.map(c=><option key={c} value={c}>{c}</option>)}
+                </select>
+              </FRow>
+              <FRow label="SKU" hint="Auto-generated">
+                <input value={form.sku||""} readOnly style={{...INP,background:"#f3f4f6",color:"#6b7280",fontFamily:"monospace"}}/>
+              </FRow>
+              <FRow label="Status">
+                <select value={form.active?"active":"hidden"} onChange={e=>setForm(f=>({...f,active:e.target.value==="active"}))} style={INP}>
+                  <option value="active">Active</option><option value="hidden">Hidden</option>
+                </select>
+              </FRow>
             </div>
-            {msg&&<div style={{marginTop:10,fontSize:13,color:msg==="Saved!"?"#166534":"#991b1b",fontWeight:700}}>{msg}</div>}
+            {msg&&<div style={{marginTop:10,fontSize:13,fontWeight:700,color:msg==="Saved!"?"#166534":"#991b1b"}}>{msg}</div>}
             <div style={{display:"flex",gap:8,marginTop:16}}>
-              <button onClick={()=>setEditModal(null)} style={{flex:1,padding:"10px 0",border:"1px solid #e5e7eb",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,background:"#fff"}}>Cancel</button>
-              <button onClick={save} disabled={saving} style={{flex:2,padding:"10px 0",background:saving?"#a5b4fc":primary,color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:800}}>{saving?"Saving…":"Save Changes"}</button>
+              <button onClick={()=>setModal(null)} style={{flex:1,padding:"10px 0",border:"1px solid #e5e7eb",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700}}>Cancel</button>
+              <button onClick={save} disabled={saving} style={{flex:2,padding:"10px 0",background:saving?"#a5b4fc":(primary||"#4f46e5"),color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:800}}>{saving?"Saving…":modal==="add"?"Add Product":"Save Changes"}</button>
             </div>
           </div>
         </div>
