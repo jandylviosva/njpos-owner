@@ -131,48 +131,27 @@ export default function App() {
 // LOGIN SCREEN — Email then OTP
 // ════════════════════════════════════════════════════════
 function LoginScreen({ onLogin }) {
-  const [step, setStep]       = useState("email"); // email | otp
-  const [email, setEmail]     = useState("");
-  const [otp, setOtp]         = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState("");
-  const [status, setStatus]   = useState("");
-  const [countdown, setCountdown] = useState(0);
-  const timerRef = useRef(null);
+  const [email,    setEmail]    = useState("");
+  const [password, setPassword] = useState("");
+  const [showPw,   setShowPw]   = useState(false);
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState("");
 
-  const startCountdown = () => {
-    setCountdown(60);
-    timerRef.current = setInterval(() => {
-      setCountdown(c => { if(c<=1){ clearInterval(timerRef.current); return 0; } return c-1; });
-    }, 1000);
-  };
-
-  const sendOTP = async () => {
-    if(!email.trim() || !/\S+@\S+\.\S+/.test(email)) { setError("Enter a valid email address"); return; }
-    setLoading(true); setError(""); setStatus("Sending code to your email…");
-    // First check if this email is a registered store owner
+  const login = async () => {
+    if(!email.trim())    { setError("Enter your email address"); return; }
+    if(!password.trim()) { setError("Enter your password"); return; }
+    setLoading(true); setError("");
+    // Look up store by owner email
     const store = await supa.get("stores", { owner_email: email.trim().toLowerCase() });
-    if(!store) { setError("No store found with this email. Contact your POS Pro provider."); setLoading(false); setStatus(""); return; }
-    // Send OTP via Supabase Auth
-    const ok = await supa.sendOTP(email.trim().toLowerCase());
-    if(!ok) {
-      // Supabase Auth OTP might need setup — fallback: use simple 6-digit code stored in DB
-      // For now show instructions
-      setError("OTP email failed. Make sure Supabase Auth is enabled (see setup instructions).");
-      setLoading(false); setStatus(""); return;
+    if(!store) {
+      setError("No account found with this email. Contact your POS Pro provider.");
+      setLoading(false); return;
     }
-    setStep("otp"); setStatus(""); startCountdown();
-    setLoading(false);
-  };
-
-  const verifyOTP = async () => {
-    if(!otp.trim() || otp.length < 6) { setError("Enter the 6-digit code from your email"); return; }
-    setLoading(true); setError(""); setStatus("Verifying…");
-    const result = await supa.verifyOTP(email.trim().toLowerCase(), otp.trim());
-    if(!result?.access_token) { setError("Invalid or expired code. Try again."); setLoading(false); setStatus(""); return; }
-    // Get store info
-    const store = await supa.get("stores", { owner_email: email.trim().toLowerCase() });
-    if(!store) { setError("Store not found."); setLoading(false); setStatus(""); return; }
+    // Check password matches (owner_password in stores table)
+    if(store.owner_password !== password) {
+      setError("Incorrect password. Please try again.");
+      setLoading(false); return;
+    }
     onLogin({ storeId: store.id, email: store.owner_email, storeName: store.store_name, ownerName: store.owner_name });
     setLoading(false);
   };
@@ -189,46 +168,52 @@ function LoginScreen({ onLogin }) {
         </div>
 
         <div style={{background:"#fff",borderRadius:20,padding:"28px 28px 24px",boxShadow:"0 24px 60px rgba(0,0,0,0.4)"}}>
-          {step==="email" && (
-            <>
-              <div style={{fontWeight:800,fontSize:17,marginBottom:4}}>Sign In</div>
-              <div style={{fontSize:13,color:"#9ca3af",marginBottom:22}}>Enter your owner email to receive a sign-in code</div>
-              <div style={{marginBottom:16}}>
-                <label style={LBL}>Owner Email</label>
-                <input type="email" value={email} onChange={e=>{setEmail(e.target.value);setError("");}} placeholder="owner@youremail.com" style={INP} autoFocus onKeyDown={e=>e.key==="Enter"&&sendOTP()}/>
-              </div>
-              {error&&<div style={{marginBottom:12,padding:"9px 12px",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,fontSize:13,color:"#991b1b"}}>{error}</div>}
-              {status&&<div style={{marginBottom:12,padding:"9px 12px",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:8,fontSize:13,color:"#166534"}}>{status}</div>}
-              <button onClick={sendOTP} disabled={loading} style={{width:"100%",padding:"12px 0",background:loading?"#a5b4fc":"#4f46e5",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                {loading?<><i className="ti ti-loader-2" style={{fontSize:17}}/>Sending…</>:<><i className="ti ti-mail" style={{fontSize:17}}/>Send Sign-In Code</>}
-              </button>
-            </>
-          )}
+          <div style={{fontWeight:800,fontSize:17,marginBottom:4}}>Sign In</div>
+          <div style={{fontSize:13,color:"#9ca3af",marginBottom:22}}>Use your owner email and POS password</div>
 
-          {step==="otp" && (
-            <>
-              <button onClick={()=>{setStep("email");setOtp("");setError("");clearInterval(timerRef.current);}} style={{display:"flex",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",color:"#6b7280",fontSize:12,fontWeight:600,marginBottom:14,padding:0}}>
-                <i className="ti ti-arrow-left" style={{fontSize:15}}/> Back
-              </button>
-              <div style={{fontWeight:800,fontSize:17,marginBottom:4}}>Enter Your Code</div>
-              <div style={{fontSize:13,color:"#9ca3af",marginBottom:6}}>We sent a 6-digit code to:</div>
-              <div style={{fontSize:14,fontWeight:700,color:"#4f46e5",marginBottom:20}}>{email}</div>
-              <div style={{marginBottom:16}}>
-                <label style={LBL}>6-Digit Code</label>
-                <input type="text" inputMode="numeric" value={otp} onChange={e=>{setOtp(e.target.value.replace(/\D/g,"").slice(0,6));setError("");}} placeholder="000000" style={{...INP,fontSize:28,fontWeight:800,letterSpacing:8,textAlign:"center"}} autoFocus onKeyDown={e=>e.key==="Enter"&&verifyOTP()}/>
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            <div>
+              <label style={LBL}>Owner Email</label>
+              <input
+                type="email" value={email}
+                onChange={e=>{setEmail(e.target.value);setError("");}}
+                onKeyDown={e=>e.key==="Enter"&&login()}
+                placeholder="owner@youremail.com"
+                style={INP} autoFocus
+              />
+            </div>
+            <div>
+              <label style={LBL}>Password</label>
+              <div style={{position:"relative"}}>
+                <input
+                  type={showPw?"text":"password"} value={password}
+                  onChange={e=>{setPassword(e.target.value);setError("");}}
+                  onKeyDown={e=>e.key==="Enter"&&login()}
+                  placeholder="Your POS login password"
+                  style={{...INP,paddingRight:42}}
+                />
+                <button type="button" onClick={()=>setShowPw(s=>!s)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"#9ca3af",fontSize:18}}>
+                  <i className={`ti ${showPw?"ti-eye-off":"ti-eye"}`}/>
+                </button>
               </div>
-              {error&&<div style={{marginBottom:12,padding:"9px 12px",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,fontSize:13,color:"#991b1b"}}>{error}</div>}
-              <button onClick={verifyOTP} disabled={loading||otp.length<6} style={{width:"100%",padding:"12px 0",background:loading||otp.length<6?"#a5b4fc":"#4f46e5",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                {loading?<><i className="ti ti-loader-2" style={{fontSize:17}}/>Verifying…</>:<><i className="ti ti-check" style={{fontSize:17}}/>Verify & Sign In</>}
-              </button>
-              <div style={{marginTop:14,textAlign:"center",fontSize:12,color:"#9ca3af"}}>
-                {countdown>0
-                  ? `Resend code in ${countdown}s`
-                  : <button onClick={()=>{setOtp("");sendOTP();}} style={{background:"none",border:"none",cursor:"pointer",color:"#4f46e5",fontSize:12,fontWeight:700}}>Resend Code</button>
-                }
-              </div>
-            </>
-          )}
+            </div>
+          </div>
+
+          {error&&<div style={{marginTop:12,padding:"9px 12px",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,fontSize:13,color:"#991b1b",display:"flex",alignItems:"center",gap:7}}>
+            <i className="ti ti-alert-circle" style={{fontSize:15,flexShrink:0}}/>{error}
+          </div>}
+
+          <button onClick={login} disabled={loading} style={{width:"100%",marginTop:18,padding:"12px 0",background:loading?"#a5b4fc":"#4f46e5",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:loading?"wait":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            {loading
+              ?<><i className="ti ti-loader-2" style={{fontSize:17}}/>Signing in…</>
+              :<><i className="ti ti-login" style={{fontSize:17}}/>Sign In</>
+            }
+          </button>
+
+          <div style={{marginTop:14,padding:"10px 12px",background:"#f5f3ff",borderRadius:8,fontSize:12,color:"#5b21b6"}}>
+            <i className="ti ti-info-circle" style={{fontSize:14,marginRight:6}}/>
+            Use the same password you set when activating the POS app.
+          </div>
         </div>
         <div style={{marginTop:16,textAlign:"center",fontSize:11,color:"rgba(255,255,255,0.3)"}}>POS Pro Owner Portal v1.0</div>
       </div>
