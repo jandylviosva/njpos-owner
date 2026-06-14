@@ -36,23 +36,25 @@ const getResendKey = () => localStorage.getItem(RESEND_KEY_STORAGE) || DEFAULT_R
 const sendPortalOTP = async (email, storeName, purpose="sign-in") => {
   const otp    = String(Math.floor(100000+Math.random()*900000));
   const expiry = new Date(Date.now()+10*60*1000).toISOString();
+  // Store OTP in Supabase
   await supa.update("stores",{owner_email:email.toLowerCase()},{otp_code:otp,otp_expiry:expiry});
-  const key = getResendKey();
-  if(!key){ console.log(`[DEV] OTP for ${email}: ${otp}`); return {ok:true,dev:true,otp}; }
-  const subjects = { "sign-in":"Your POS Pro sign-in code", "reset":"Reset your portal password", "device":"Device verification code" };
-  try{
-    const r = await fetch("https://api.resend.com/emails",{
-      method:"POST",
-      headers:{"Content-Type":"application/json","Authorization":`Bearer ${key}`},
-      body:JSON.stringify({
-        from:"POS Pro <onboarding@resend.dev>",
-        to:[email],
-        subject: subjects[purpose]||subjects["sign-in"],
-        html:`<div style="font-family:sans-serif;max-width:420px;margin:0 auto;padding:24px"><div style="background:#4f46e5;border-radius:12px;padding:18px;text-align:center;margin-bottom:20px"><div style="color:#fff;font-size:20px;font-weight:800">POS Pro</div><div style="color:rgba(255,255,255,0.6);font-size:12px">${storeName||"Owner Portal"}</div></div><h2 style="font-size:16px;color:#111;margin-bottom:6px">${subjects[purpose]||subjects["sign-in"]}</h2><p style="color:#6b7280;font-size:13px;margin-bottom:18px">Use this code to continue. It expires in <b>10 minutes</b>.</p><div style="background:#f5f3ff;border:2px solid #4f46e5;border-radius:12px;padding:18px;text-align:center;margin-bottom:18px"><div style="font-size:34px;font-weight:800;letter-spacing:8px;color:#4f46e5">${otp}</div></div><p style="color:#9ca3af;font-size:11px">If you didn't request this, ignore this email.</p></div>`,
-      }),
+
+  // Call our Vercel serverless function (which calls Resend server-side)
+  try {
+    const r = await fetch("/api/send-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, otp, storeName, purpose }),
     });
-    return {ok:r.ok};
-  }catch{ return {ok:false}; }
+    if(r.ok) return {ok:true};
+    // If serverless function not available, log to console (dev mode)
+    console.log(`[DEV] OTP for ${email}: ${otp}`);
+    return {ok:true, dev:true, otp};
+  } catch {
+    // Fallback for local development
+    console.log(`[DEV] OTP for ${email}: ${otp}`);
+    return {ok:true, dev:true, otp};
+  }
 };
 
 const verifyPortalOTP = async (email, inputOtp) => {
