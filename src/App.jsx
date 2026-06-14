@@ -274,32 +274,12 @@ function LoginScreen({onLogin}){
     if(!newPw||newPw.length<6){setError("Password must be at least 6 characters");return;}
     if(newPw!==confirmPw){setError("Passwords do not match");return;}
     setLoading(true);setError("");
-
-    // 1. Verify OTP
     const valid=await verifyPortalOTP(email.trim().toLowerCase(),otp.trim());
-    if(!valid){setError("Invalid or expired code. Request a new one.");setLoading(false);return;}
-
-    // 2. Update portal password in stores table
-    const ok1=await supa.update("stores",{owner_email:email.trim().toLowerCase()},{owner_password:newPw});
-    if(!ok1){setError("Failed to update password. Try again.");setLoading(false);return;}
-
-    // 3. Update owner account password in store_data.accounts so POS login also works
-    try{
-      const store=await supa.get("stores",{owner_email:email.trim().toLowerCase()});
-      if(store?.id){
-        const sd=await supa.get("store_data",{store_id:store.id});
-        if(sd?.accounts){
-          const updated=sd.accounts.map(a=>a.roleId==="role_owner"?{...a,password:newPw}:a);
-          await supa.update("store_data",{store_id:store.id},{accounts:updated,updated_at:new Date().toISOString()});
-        }
-      }
-    }catch(e){ console.warn("Could not sync POS password:",e); }
-    // Even if step 3 fails, portal password is already updated — don't block the user
-
+    if(!valid){setError("Invalid or expired code.");setLoading(false);return;}
+    const ok=await supa.update("stores",{owner_email:email.trim().toLowerCase()},{owner_password:newPw});
     setLoading(false);
-    setScreen("login");
-    setSuccess("Password updated! Sign in with your new password.");
-    setOtp("");setNewPw("");setConfirmPw("");
+    if(ok){setScreen("login");setSuccess("Password updated! Sign in with your new password.");setOtp("");setNewPw("");setConfirmPw("");}
+    else setError("Failed to update password.");
   };
 
   const BG="linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#0f3460 100%)";
@@ -742,16 +722,6 @@ function Accounts({store,data,session,saveField}){
       updated=accounts.map(a=>a.id===form.id?form:a);
     }
     const ok=await saveField("accounts",updated);
-
-    // If editing the owner account and password changed, also sync to stores.owner_password
-    // so portal login stays in sync
-    if(ok && modal==="edit" && form.roleId==="role_owner"){
-      const original=accounts.find(a=>a.id===form.id);
-      if(original?.password!==form.password){
-        await supa.update("stores",{id:session.storeId},{owner_password:form.password});
-      }
-    }
-
     setSaving(false);setMsg(ok?"Saved!":"Failed to save.");
     if(ok)setTimeout(()=>{setModal(null);setMsg("");},700);
   };
