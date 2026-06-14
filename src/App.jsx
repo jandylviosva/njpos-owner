@@ -28,7 +28,9 @@ const saveSession = (s) => sessionStorage.setItem(SESSION_KEY,JSON.stringify(s))
 const clearSession= () => sessionStorage.removeItem(SESSION_KEY);
 
 const RESEND_KEY_STORAGE = "portal_resend_key";
-const DEFAULT_RESEND_KEY = ""; // ← PASTE YOUR re_xxxx KEY HERE
+// Key loaded from Vercel environment variable (set in Vercel dashboard)
+// Falls back to localStorage for local testing
+const DEFAULT_RESEND_KEY = import.meta.env.VITE_RESEND_KEY || "";
 const getResendKey = () => localStorage.getItem(RESEND_KEY_STORAGE) || DEFAULT_RESEND_KEY;
 
 const sendPortalOTP = async (email, storeName, purpose="sign-in") => {
