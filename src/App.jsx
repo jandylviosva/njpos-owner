@@ -276,10 +276,32 @@ function LoginScreen({onLogin}){
     setLoading(true);setError("");
     const valid=await verifyPortalOTP(email.trim().toLowerCase(),otp.trim());
     if(!valid){setError("Invalid or expired code.");setLoading(false);return;}
+
+    // 1. Update portal login password in stores table
     const ok=await supa.update("stores",{owner_email:email.trim().toLowerCase()},{owner_password:newPw});
+    if(!ok){setError("Failed to update password.");setLoading(false);return;}
+
+    // 2. Also update the owner account password in store_data.accounts
+    // so POS login reflects the new password immediately
+    const store = await supa.get("stores",{owner_email:email.trim().toLowerCase()});
+    if(store){
+      const storeData = await supa.get("store_data",{store_id:store.id});
+      if(storeData?.accounts){
+        const updatedAccounts = storeData.accounts.map(a =>
+          // Update the owner account (role_owner) password
+          a.roleId==="role_owner" ? {...a, password:newPw} : a
+        );
+        await supa.update("store_data",{store_id:store.id},{
+          accounts: updatedAccounts,
+          updated_at: new Date().toISOString(),
+        });
+      }
+    }
+
     setLoading(false);
-    if(ok){setScreen("login");setSuccess("Password updated! Sign in with your new password.");setOtp("");setNewPw("");setConfirmPw("");}
-    else setError("Failed to update password.");
+    setScreen("login");
+    setSuccess("Password updated! Sign in with your new password.");
+    setOtp("");setNewPw("");setConfirmPw("");
   };
 
   const BG="linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#0f3460 100%)";
