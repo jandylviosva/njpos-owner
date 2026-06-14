@@ -27,6 +27,40 @@ const getSession  = () => { try{return JSON.parse(sessionStorage.getItem(SESSION
 const saveSession = (s) => sessionStorage.setItem(SESSION_KEY,JSON.stringify(s));
 const clearSession= () => sessionStorage.removeItem(SESSION_KEY);
 
+const RESEND_KEY_STORAGE = "portal_resend_key";
+const DEFAULT_RESEND_KEY = ""; // ← PASTE YOUR re_xxxx KEY HERE
+const getResendKey = () => localStorage.getItem(RESEND_KEY_STORAGE) || DEFAULT_RESEND_KEY;
+
+const sendPortalOTP = async (email, storeName, purpose="sign-in") => {
+  const otp    = String(Math.floor(100000+Math.random()*900000));
+  const expiry = new Date(Date.now()+10*60*1000).toISOString();
+  await supa.update("stores",{owner_email:email.toLowerCase()},{otp_code:otp,otp_expiry:expiry});
+  const key = getResendKey();
+  if(!key){ console.log(`[DEV] OTP for ${email}: ${otp}`); return {ok:true,dev:true,otp}; }
+  const subjects = { "sign-in":"Your POS Pro sign-in code", "reset":"Reset your portal password", "device":"Device verification code" };
+  try{
+    const r = await fetch("https://api.resend.com/emails",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":`Bearer ${key}`},
+      body:JSON.stringify({
+        from:"POS Pro <onboarding@resend.dev>",
+        to:[email],
+        subject: subjects[purpose]||subjects["sign-in"],
+        html:`<div style="font-family:sans-serif;max-width:420px;margin:0 auto;padding:24px"><div style="background:#4f46e5;border-radius:12px;padding:18px;text-align:center;margin-bottom:20px"><div style="color:#fff;font-size:20px;font-weight:800">POS Pro</div><div style="color:rgba(255,255,255,0.6);font-size:12px">${storeName||"Owner Portal"}</div></div><h2 style="font-size:16px;color:#111;margin-bottom:6px">${subjects[purpose]||subjects["sign-in"]}</h2><p style="color:#6b7280;font-size:13px;margin-bottom:18px">Use this code to continue. It expires in <b>10 minutes</b>.</p><div style="background:#f5f3ff;border:2px solid #4f46e5;border-radius:12px;padding:18px;text-align:center;margin-bottom:18px"><div style="font-size:34px;font-weight:800;letter-spacing:8px;color:#4f46e5">${otp}</div></div><p style="color:#9ca3af;font-size:11px">If you didn't request this, ignore this email.</p></div>`,
+      }),
+    });
+    return {ok:r.ok};
+  }catch{ return {ok:false}; }
+};
+
+const verifyPortalOTP = async (email, inputOtp) => {
+  const store = await supa.get("stores",{owner_email:email.toLowerCase()});
+  if(!store||store.otp_code!==inputOtp) return false;
+  if(new Date()>new Date(store.otp_expiry)) return false;
+  await supa.update("stores",{owner_email:email.toLowerCase()},{otp_code:null,otp_expiry:null});
+  return true;
+};
+
 const LBL={fontSize:11,fontWeight:800,color:"#6b7280",textTransform:"uppercase",letterSpacing:0.5,display:"block",marginBottom:5};
 const INP={width:"100%",padding:"10px 12px",border:"1px solid #e5e7eb",borderRadius:8,fontSize:13,background:"#f9fafb",color:"#111",outline:"none",boxSizing:"border-box"};
 function Card({children,style={}}){return<div style={{background:"#fff",borderRadius:14,padding:20,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",marginBottom:16,...style}}>{children}</div>;}
@@ -49,8 +83,10 @@ export default function App(){
   const [data,setData]=useState(null);
   const [loading,setLoading]=useState(false);
   const [view,setView]=useState("dashboard");
-  const [saveStatus,setSaveStatus]=useState(""); // "" | "saving" | "saved" | "error"
+  const [saveStatus,setSaveStatus]=useState("");
+  const [drawerOpen,setDrawerOpen]=useState(false);
   const refreshRef=useRef(null);
+  const lastPushTs=useRef(sessionStorage.getItem("portal_lastPush")||"0");
 
   const loadData=useCallback(async(storeId)=>{
     setLoading(true);
@@ -59,6 +95,9 @@ export default function App(){
       supa.get("store_data",{store_id:storeId}),
     ]);
     setStore(s); setData(d); setLoading(false);
+    // Track last load timestamp
+    lastPushTs.current=new Date().toISOString();
+    sessionStorage.setItem("portal_lastPush",lastPushTs.current);
   },[]);
 
   useEffect(()=>{
@@ -69,14 +108,20 @@ export default function App(){
     return()=>clearInterval(refreshRef.current);
   },[session,loadData]);
 
-  // Save any field to store_data
+  // Save field — update Supabase and local data immediately
   const saveField=useCallback(async(field,value)=>{
     if(!session?.storeId)return false;
     setSaveStatus("saving");
-    const ok=await supa.update("store_data",{store_id:session.storeId},{[field]:value,updated_at:new Date().toISOString()});
-    setSaveStatus(ok?"saved":"error");
+    const now=new Date().toISOString();
+    const ok=await supa.update("store_data",{store_id:session.storeId},{[field]:value,updated_at:now});
+    if(ok){
+      setSaveStatus("saved");
+      setData(prev=>({...prev,[field]:value,updated_at:now}));
+      // Update our last push time so POS knows cloud is newer
+      lastPushTs.current=now;
+      sessionStorage.setItem("portal_lastPush",now);
+    } else { setSaveStatus("error"); }
     setTimeout(()=>setSaveStatus(""),2500);
-    if(ok) setData(prev=>({...prev,[field]:value}));
     return ok;
   },[session]);
 
@@ -99,37 +144,81 @@ export default function App(){
     {id:"settings", icon:"ti-settings",         label:"Settings"},
   ];
 
-  // Sync dot
   const SyncBadge=()=>(
-    <div title={saveStatus==="saving"?"Saving…":saveStatus==="saved"?"Saved to cloud":saveStatus==="error"?"Save failed":""} style={{width:8,height:8,borderRadius:"50%",background:saveStatus==="saving"?"#f59e0b":saveStatus==="saved"?"#16a34a":saveStatus==="error"?"#dc2626":"transparent",boxShadow:saveStatus==="saved"?"0 0 6px #16a34a":saveStatus==="saving"?"0 0 6px #f59e0b":"none",flexShrink:0,transition:"background 0.3s"}}/>
+    <div title={saveStatus==="saving"?"Saving…":saveStatus==="saved"?"Saved":saveStatus==="error"?"Save failed":""} style={{width:8,height:8,borderRadius:"50%",background:saveStatus==="saving"?"#f59e0b":saveStatus==="saved"?"#16a34a":saveStatus==="error"?"#dc2626":"transparent",boxShadow:saveStatus==="saved"?"0 0 6px #16a34a":saveStatus==="saving"?"0 0 6px #f59e0b":"none",flexShrink:0,transition:"background 0.3s"}}/>
   );
 
   return(
     <div style={{minHeight:"100vh",background:BG,fontFamily:"sans-serif"}}>
       {/* HEADER */}
-      <div style={{background:SIDEBAR,color:"#fff",padding:"0 20px",display:"flex",alignItems:"center",gap:12,height:54,position:"sticky",top:0,zIndex:100,boxShadow:"0 2px 8px rgba(0,0,0,0.3)"}}>
-        <div style={{display:"flex",alignItems:"center",gap:8,marginRight:8}}>
-          <div style={{width:30,height:30,borderRadius:8,background:PRIMARY,display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <i className="ti ti-shopping-cart" style={{fontSize:15,color:"#fff"}}/>
+      <div style={{background:SIDEBAR,color:"#fff",padding:"0 16px",display:"flex",alignItems:"center",gap:10,height:54,position:"sticky",top:0,zIndex:100,boxShadow:"0 2px 8px rgba(0,0,0,0.3)"}}>
+        {/* Hamburger — mobile only */}
+        <button onClick={()=>setDrawerOpen(true)} style={{display:"none",background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.8)",fontSize:22,padding:4,flexShrink:0,className:"mobile-menu-btn"}} className="mobile-hamburger">
+          <i className="ti ti-menu-2"/>
+        </button>
+        <style>{`@media(max-width:767px){.mobile-hamburger{display:block!important}.desktop-nav{display:none!important}}`}</style>
+
+        {/* Logo */}
+        <div style={{display:"flex",alignItems:"center",gap:8,marginRight:4,flexShrink:0}}>
+          <div style={{width:28,height:28,borderRadius:7,background:PRIMARY,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <i className="ti ti-shopping-cart" style={{fontSize:14,color:"#fff"}}/>
           </div>
           <div>
-            <div style={{fontWeight:800,fontSize:12,lineHeight:1}}>{store?.store_name||"POS Pro"}</div>
-            <div style={{fontSize:10,color:"rgba(255,255,255,0.4)",marginTop:1}}>Owner Portal</div>
+            <div style={{fontWeight:800,fontSize:11,lineHeight:1}}>{store?.store_name||"POS Pro"}</div>
+            <div style={{fontSize:9,color:"rgba(255,255,255,0.4)",marginTop:1}}>Owner Portal</div>
           </div>
         </div>
-        <div style={{display:"flex",gap:1,flex:1,overflowX:"auto",scrollbarWidth:"none"}}>
+
+        {/* Desktop nav */}
+        <div className="desktop-nav" style={{display:"flex",gap:1,flex:1,overflowX:"auto",scrollbarWidth:"none"}}>
           {NAV.map(n=>(
             <button key={n.id} onClick={()=>setView(n.id)} style={{padding:"6px 10px",borderRadius:7,border:"none",cursor:"pointer",background:view===n.id?PRIMARY:"transparent",color:view===n.id?"#fff":"rgba(255,255,255,0.55)",fontSize:12,fontWeight:600,display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap",flexShrink:0}}>
-              <i className={`ti ${n.icon}`} style={{fontSize:15}}/><span>{n.label}</span>
+              <i className={`ti ${n.icon}`} style={{fontSize:14}}/><span>{n.label}</span>
             </button>
           ))}
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+
+        <div style={{display:"flex",alignItems:"center",gap:7,flexShrink:0,marginLeft:"auto"}}>
           <SyncBadge/>
-          <button onClick={()=>loadData(session.storeId)} title="Refresh" style={{background:"rgba(255,255,255,0.08)",border:"none",borderRadius:7,padding:"5px 9px",cursor:"pointer",color:"rgba(255,255,255,0.7)",fontSize:17}}><i className={`ti ti-refresh${loading?" ti-spin":""}`}/></button>
-          <button onClick={handleLogout} title="Sign out" style={{background:"rgba(255,255,255,0.08)",border:"none",borderRadius:7,padding:"5px 9px",cursor:"pointer",color:"rgba(255,255,255,0.7)",fontSize:17}}><i className="ti ti-logout"/></button>
+          <button onClick={()=>loadData(session.storeId)} title="Refresh" style={{background:"rgba(255,255,255,0.08)",border:"none",borderRadius:7,padding:"5px 8px",cursor:"pointer",color:"rgba(255,255,255,0.7)",fontSize:16}}><i className={`ti ti-refresh${loading?" ti-spin":""}`}/></button>
+          <button onClick={handleLogout} title="Sign out" style={{background:"rgba(255,255,255,0.08)",border:"none",borderRadius:7,padding:"5px 8px",cursor:"pointer",color:"rgba(255,255,255,0.7)",fontSize:16}}><i className="ti ti-logout"/></button>
         </div>
       </div>
+
+      {/* MOBILE DRAWER */}
+      {drawerOpen&&(
+        <div style={{position:"fixed",inset:0,zIndex:500}} onClick={()=>setDrawerOpen(false)}>
+          <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.5)"}}/>
+          <div style={{position:"absolute",left:0,top:0,bottom:0,width:260,background:SIDEBAR,boxShadow:"4px 0 20px rgba(0,0,0,0.4)",display:"flex",flexDirection:"column",padding:"16px 12px"}} onClick={e=>e.stopPropagation()}>
+            {/* Drawer header */}
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,padding:"0 4px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:34,height:34,borderRadius:9,background:PRIMARY,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <i className="ti ti-shopping-cart" style={{fontSize:17,color:"#fff"}}/>
+                </div>
+                <div>
+                  <div style={{fontWeight:800,fontSize:14,color:"#fff"}}>{store?.store_name||"POS Pro"}</div>
+                  <div style={{fontSize:10,color:"rgba(255,255,255,0.4)"}}>Owner Portal</div>
+                </div>
+              </div>
+              <button onClick={()=>setDrawerOpen(false)} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.5)",fontSize:20}}>
+                <i className="ti ti-x"/>
+              </button>
+            </div>
+            {/* Drawer nav items */}
+            {NAV.map(n=>(
+              <button key={n.id} onClick={()=>{setView(n.id);setDrawerOpen(false);}} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",borderRadius:10,border:"none",cursor:"pointer",background:view===n.id?PRIMARY:"transparent",color:view===n.id?"#fff":"rgba(255,255,255,0.6)",fontSize:14,fontWeight:600,marginBottom:4,textAlign:"left"}}>
+                <i className={`ti ${n.icon}`} style={{fontSize:18,flexShrink:0}}/>{n.label}
+              </button>
+            ))}
+            <div style={{marginTop:"auto",padding:"12px 14px",borderTop:"1px solid rgba(255,255,255,0.1)"}}>
+              <button onClick={handleLogout} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:10,border:"none",cursor:"pointer",background:"transparent",color:"rgba(255,255,255,0.5)",fontSize:13,fontWeight:600,width:"100%"}}>
+                <i className="ti ti-logout" style={{fontSize:16}}/>Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{maxWidth:1100,margin:"0 auto",padding:"20px 16px"}}>
         {loading&&!data&&<div style={{textAlign:"center",padding:80,color:"#9ca3af"}}><i className="ti ti-loader-2" style={{fontSize:40,display:"block",marginBottom:10}}/>Loading store data…</div>}
@@ -146,14 +235,19 @@ export default function App(){
 
 // ════════════ LOGIN ════════════
 function LoginScreen({onLogin}){
+  const [screen,setScreen]=useState("login");
   const [email,setEmail]=useState("");
   const [password,setPassword]=useState("");
   const [showPw,setShowPw]=useState(false);
+  const [otp,setOtp]=useState("");
+  const [newPw,setNewPw]=useState("");
+  const [confirmPw,setConfirmPw]=useState("");
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
+  const [success,setSuccess]=useState("");
+
   const login=async()=>{
-    if(!email.trim()){setError("Enter your email address");return;}
-    if(!password.trim()){setError("Enter your password");return;}
+    if(!email.trim()||!password.trim()){setError("Enter email and password");return;}
     setLoading(true);setError("");
     const store=await supa.get("stores",{owner_email:email.trim().toLowerCase()});
     if(!store){setError("No account found with this email.");setLoading(false);return;}
@@ -161,8 +255,32 @@ function LoginScreen({onLogin}){
     onLogin({storeId:store.id,email:store.owner_email,storeName:store.store_name,ownerName:store.owner_name});
     setLoading(false);
   };
+  const sendForgotOTP=async()=>{
+    if(!email.trim()||!/\S+@\S+\.\S+/.test(email)){setError("Enter a valid email");return;}
+    setLoading(true);setError("");
+    const store=await supa.get("stores",{owner_email:email.trim().toLowerCase()});
+    if(!store){setError("No account found with this email.");setLoading(false);return;}
+    const result=await sendPortalOTP(email.trim().toLowerCase(),store.store_name,"reset");
+    if(!result.ok){setError("Failed to send code. Check your connection.");setLoading(false);return;}
+    setSuccess(result.dev?`[DEV] Check console for OTP`:"Code sent to your email!");
+    setLoading(false);setScreen("otp");
+  };
+  const verifyAndReset=async()=>{
+    if(!otp||otp.length<6){setError("Enter the 6-digit code");return;}
+    if(!newPw||newPw.length<6){setError("Password must be at least 6 characters");return;}
+    if(newPw!==confirmPw){setError("Passwords do not match");return;}
+    setLoading(true);setError("");
+    const valid=await verifyPortalOTP(email.trim().toLowerCase(),otp.trim());
+    if(!valid){setError("Invalid or expired code.");setLoading(false);return;}
+    const ok=await supa.update("stores",{owner_email:email.trim().toLowerCase()},{owner_password:newPw});
+    setLoading(false);
+    if(ok){setScreen("login");setSuccess("Password updated! Sign in with your new password.");setOtp("");setNewPw("");setConfirmPw("");}
+    else setError("Failed to update password.");
+  };
+
+  const BG="linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#0f3460 100%)";
   return(
-    <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#0f3460 100%)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"sans-serif",padding:20}}>
+    <div style={{minHeight:"100vh",background:BG,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"sans-serif",padding:20}}>
       <div style={{width:"100%",maxWidth:400}}>
         <div style={{textAlign:"center",marginBottom:24}}>
           <div style={{width:66,height:66,borderRadius:18,background:"#4f46e5",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",boxShadow:"0 8px 32px rgba(79,70,229,0.5)"}}><i className="ti ti-shopping-cart" style={{fontSize:30,color:"#fff"}}/></div>
@@ -170,23 +288,50 @@ function LoginScreen({onLogin}){
           <div style={{fontSize:12,color:"rgba(255,255,255,0.45)",marginTop:3}}>Owner Portal</div>
         </div>
         <div style={{background:"#fff",borderRadius:20,padding:"28px 28px 24px",boxShadow:"0 24px 60px rgba(0,0,0,0.4)"}}>
-          <div style={{fontWeight:800,fontSize:17,marginBottom:4}}>Sign In</div>
-          <div style={{fontSize:13,color:"#9ca3af",marginBottom:20}}>Use your owner email and POS password</div>
-          <div style={{display:"flex",flexDirection:"column",gap:14}}>
-            <FRow label="Owner Email"><input type="email" value={email} onChange={e=>{setEmail(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&login()} placeholder="owner@email.com" style={INP} autoFocus/></FRow>
-            <FRow label="Password">
-              <div style={{position:"relative"}}>
-                <input type={showPw?"text":"password"} value={password} onChange={e=>{setPassword(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&login()} placeholder="Your POS password" style={{...INP,paddingRight:42}}/>
-                <button type="button" onClick={()=>setShowPw(s=>!s)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"#9ca3af",fontSize:18}}><i className={`ti ${showPw?"ti-eye-off":"ti-eye"}`}/></button>
-              </div>
-            </FRow>
-          </div>
-          <Err msg={error}/>
-          <button onClick={login} disabled={loading} style={{width:"100%",marginTop:18,padding:"12px 0",background:loading?"#a5b4fc":"#4f46e5",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-            {loading?<><i className="ti ti-loader-2" style={{fontSize:17}}/>Signing in…</>:<><i className="ti ti-login" style={{fontSize:17}}/>Sign In</>}
-          </button>
-          <div style={{marginTop:14,padding:"9px 12px",background:"#f5f3ff",borderRadius:8,fontSize:12,color:"#5b21b6"}}><i className="ti ti-info-circle" style={{fontSize:13,marginRight:5}}/>Same password you set when activating the POS app.</div>
+          {screen==="login"&&(<>
+            <div style={{fontWeight:800,fontSize:17,marginBottom:4}}>Sign In</div>
+            <div style={{fontSize:13,color:"#9ca3af",marginBottom:20}}>Use your owner email and POS password</div>
+            <div style={{display:"flex",flexDirection:"column",gap:14}}>
+              <FRow label="Owner Email"><input type="email" value={email} onChange={e=>{setEmail(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&login()} placeholder="owner@email.com" style={INP} autoFocus/></FRow>
+              <FRow label="Password">
+                <div style={{position:"relative"}}>
+                  <input type={showPw?"text":"password"} value={password} onChange={e=>{setPassword(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&login()} style={{...INP,paddingRight:42}} placeholder="Your POS password"/>
+                  <button type="button" onClick={()=>setShowPw(s=>!s)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"#9ca3af",fontSize:18}}><i className={`ti ${showPw?"ti-eye-off":"ti-eye"}`}/></button>
+                </div>
+              </FRow>
+            </div>
+            <Err msg={error}/><Ok msg={success}/>
+            <button onClick={login} disabled={loading} style={{width:"100%",marginTop:18,padding:"12px 0",background:loading?"#a5b4fc":"#4f46e5",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              {loading?<><i className="ti ti-loader-2" style={{fontSize:17}}/>Signing in…</>:<><i className="ti ti-login" style={{fontSize:17}}/>Sign In</>}
+            </button>
+            <div style={{marginTop:14,textAlign:"center"}}><button onClick={()=>{setScreen("forgot");setError("");setSuccess("");}} style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:"#4f46e5",fontWeight:600}}>Forgot password?</button></div>
+          </>)}
+          {screen==="forgot"&&(<>
+            <button onClick={()=>{setScreen("login");setError("");}} style={{display:"flex",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",color:"#6b7280",fontSize:12,fontWeight:600,marginBottom:14,padding:0}}><i className="ti ti-arrow-left" style={{fontSize:14}}/> Back</button>
+            <div style={{fontWeight:800,fontSize:17,marginBottom:4}}>Reset Password</div>
+            <div style={{fontSize:13,color:"#9ca3af",marginBottom:18}}>We'll send a code to your email</div>
+            <FRow label="Owner Email"><input type="email" value={email} onChange={e=>{setEmail(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&sendForgotOTP()} placeholder="owner@email.com" style={INP} autoFocus/></FRow>
+            <Err msg={error}/>
+            <button onClick={sendForgotOTP} disabled={loading} style={{width:"100%",marginTop:16,padding:"12px 0",background:loading?"#a5b4fc":"#4f46e5",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              {loading?<><i className="ti ti-loader-2" style={{fontSize:17}}/>Sending…</>:<><i className="ti ti-mail" style={{fontSize:17}}/>Send Reset Code</>}
+            </button>
+          </>)}
+          {screen==="otp"&&(<>
+            <button onClick={()=>{setScreen("forgot");setError("");}} style={{display:"flex",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",color:"#6b7280",fontSize:12,fontWeight:600,marginBottom:14,padding:0}}><i className="ti ti-arrow-left" style={{fontSize:14}}/> Back</button>
+            <div style={{fontWeight:800,fontSize:17,marginBottom:4}}>Enter Code & New Password</div>
+            <Ok msg={success}/>
+            <div style={{display:"flex",flexDirection:"column",gap:12,marginTop:12}}>
+              <FRow label="6-Digit Code"><input type="text" inputMode="numeric" value={otp} onChange={e=>{setOtp(e.target.value.replace(/\D/g,"").slice(0,6));setError("");}} placeholder="000000" style={{...INP,fontSize:22,fontWeight:800,letterSpacing:8,textAlign:"center"}} autoFocus/></FRow>
+              <FRow label="New Password"><input type="password" value={newPw} onChange={e=>{setNewPw(e.target.value);setError("");}} placeholder="Min. 6 characters" style={INP}/></FRow>
+              <FRow label="Confirm Password"><input type="password" value={confirmPw} onChange={e=>{setConfirmPw(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&verifyAndReset()} style={INP}/></FRow>
+            </div>
+            <Err msg={error}/>
+            <button onClick={verifyAndReset} disabled={loading||otp.length<6} style={{width:"100%",marginTop:16,padding:"12px 0",background:loading||otp.length<6?"#a5b4fc":"#4f46e5",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              {loading?<><i className="ti ti-loader-2" style={{fontSize:17}}/>Updating…</>:<><i className="ti ti-check" style={{fontSize:17}}/>Reset Password</>}
+            </button>
+          </>)}
         </div>
+        <div style={{marginTop:14,textAlign:"center",fontSize:11,color:"rgba(255,255,255,0.25)"}}>POS Pro Owner Portal</div>
       </div>
     </div>
   );
