@@ -555,16 +555,20 @@ function Inventory({store,data,session,saveField,primary}){
   const skuSettings=data?.sku_settings||{prefix:"SW",suffix:"",counter:0};
   const [search,setSearch]=useState("");
   const [catFilter,setCat]=useState("All");
-  const [modal,setModal]=useState(null);
+  const [modal,setModal]=useState(null); // null | "add" | "edit"
   const [form,setForm]=useState({});
   const [saving,setSaving]=useState(false);
   const [msg,setMsg]=useState("");
+  const [deleteModal,setDeleteModal]=useState(null);
+  const [deleteReason,setDeleteReason]=useState("");
+  const [deleting,setDeleting]=useState(false);
   // CSV
   const [importModal,setImportModal]=useState(false);
   const [importRows,setImportRows]=useState([]);
   const [importErrors,setImportErrors]=useState([]);
   const [importing,setImporting]=useState(false);
   const csvRef=useRef(null);
+  const imgRef=useRef(null);
 
   const genNextSKU=()=>{
     const counter=(skuSettings.counter||0)+1;
@@ -589,58 +593,48 @@ function Inventory({store,data,session,saveField,primary}){
     if(ok)setTimeout(()=>{setModal(null);setMsg("");},700);
   };
 
+  const doDelete=async()=>{
+    if(!deleteModal)return;
+    setDeleting(true);
+    const updated=products.filter(p=>p.id!==deleteModal.id);
+    const ok=await saveField("products",updated);
+    setDeleting(false);
+    if(ok){setDeleteModal(null);setDeleteReason("");}
+    else setMsg("Failed to delete.");
+  };
+
+  const handleImg=(e)=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>setForm(x=>({...x,image:ev.target.result}));r.readAsDataURL(f);};
+
   // ── CSV EXPORT ──
   const exportCSV=()=>{
     const headers=["name","category","price","stock","sku","active"];
-    const rows=products.map(p=>[
-      `"${(p.name||"").replace(/"/g,'""')}"`,
-      `"${(p.category||"").replace(/"/g,'""')}"`,
-      p.price||0, p.stock||0,
-      `"${(p.sku||"").replace(/"/g,'""')}"`,
-      p.active===false?"false":"true",
-    ].join(","));
+    const rows=products.map(p=>[`"${(p.name||"").replace(/"/g,'""')}"`,,`"${(p.category||"").replace(/"/g,'""')}"`,,p.price||0,p.stock||0,`"${(p.sku||"").replace(/"/g,'""')}"`,p.active===false?"false":"true"].join(","));
     const csv=[headers.join(","),...rows].join("\n");
     const blob=new Blob([csv],{type:"text/csv"});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement("a");
-    a.href=url;a.download=`inventory-${new Date().toISOString().slice(0,10)}.csv`;a.click();
-    URL.revokeObjectURL(url);
+    const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`inventory-${new Date().toISOString().slice(0,10)}.csv`;a.click();URL.revokeObjectURL(url);
   };
 
-  // ── CSV IMPORT PARSE ──
+  // ── CSV IMPORT ──
   const handleCSVFile=(e)=>{
     const file=e.target.files[0];if(!file)return;
     const reader=new FileReader();
     reader.onload=(ev)=>{
       const text=ev.target.result;
       const lines=text.split("\n").map(l=>l.trim()).filter(Boolean);
-      if(lines.length<2){alert("CSV is empty or has no data rows");return;}
+      if(lines.length<2){alert("CSV is empty");return;}
       const headers=lines[0].toLowerCase().split(",").map(h=>h.trim().replace(/"/g,""));
       const nameIdx=headers.indexOf("name"),catIdx=headers.indexOf("category"),priceIdx=headers.indexOf("price"),stockIdx=headers.indexOf("stock"),skuIdx=headers.indexOf("sku"),activeIdx=headers.indexOf("active");
-      if(nameIdx===-1||priceIdx===-1){alert("CSV must have 'name' and 'price' columns");return;}
+      if(nameIdx===-1||priceIdx===-1){alert("CSV must have name and price columns");return;}
       const rows=[];const errors=[];
       lines.slice(1).forEach((line,i)=>{
         const cols=line.match(/(".*?"|[^,]+)(?=,|$)/g)||line.split(",");
         const clean=cols.map(c=>c.trim().replace(/^"|"$/g,"").replace(/""/g,'"'));
-        const name=clean[nameIdx]?.trim()||"";
-        const price=parseFloat(clean[priceIdx])||0;
+        const name=clean[nameIdx]?.trim()||"";const price=parseFloat(clean[priceIdx])||0;
         if(!name){errors.push(`Row ${i+2}: missing name`);return;}
-        if(price<=0){errors.push(`Row ${i+2}: invalid price for "${name}"`);return;}
-        rows.push({
-          name,
-          category:catIdx!==-1?clean[catIdx]||categories[0]||"Others":categories[0]||"Others",
-          price,stock:stockIdx!==-1?parseInt(clean[stockIdx])||0:0,
-          sku:skuIdx!==-1?clean[skuIdx]||"":"",
-          active:activeIdx!==-1?clean[activeIdx]?.toLowerCase()!=="false":true,
-          _action:"?",_matchId:null,
-        });
+        if(price<=0){errors.push(`Row ${i+2}: invalid price`);return;}
+        rows.push({name,category:catIdx!==-1?clean[catIdx]||categories[0]||"Others":categories[0]||"Others",price,stock:stockIdx!==-1?parseInt(clean[stockIdx])||0:0,sku:skuIdx!==-1?clean[skuIdx]||"":"",active:activeIdx!==-1?clean[activeIdx]?.toLowerCase()!=="false":true,_action:"?",_matchId:null});
       });
-      rows.forEach(r=>{
-        const bysku=r.sku&&products.find(p=>p.sku===r.sku);
-        const byname=!bysku&&products.find(p=>p.name.toLowerCase()===r.name.toLowerCase());
-        r._action=bysku||byname?"update":"create";
-        r._matchId=bysku?.id||byname?.id||null;
-      });
+      rows.forEach(r=>{const bysku=r.sku&&products.find(p=>p.sku===r.sku);const byname=!bysku&&products.find(p=>p.name.toLowerCase()===r.name.toLowerCase());r._action=bysku||byname?"update":"create";r._matchId=bysku?.id||byname?.id||null;});
       setImportRows(rows);setImportErrors(errors);setImportModal(true);e.target.value="";
     };
     reader.readAsText(file);
@@ -648,18 +642,12 @@ function Inventory({store,data,session,saveField,primary}){
 
   const doImport=async()=>{
     setImporting(true);
-    let nextCounter=skuSettings.counter||0;
-    const newCats=[...categories];
-    const updated=[...products];
+    let nextCounter=skuSettings.counter||0;const newCats=[...categories];const updated=[...products];
     importRows.forEach(r=>{
       if(r.category&&!newCats.includes(r.category))newCats.push(r.category);
       if(!r.sku){nextCounter++;r.sku=`${(skuSettings.prefix||"SW").toUpperCase()}${String(nextCounter).padStart(5,"0")}${(skuSettings.suffix||"").toUpperCase()}`;}
-      if(r._action==="update"&&r._matchId){
-        const idx=updated.findIndex(p=>p.id===r._matchId);
-        if(idx!==-1)updated[idx]={...updated[idx],name:r.name,category:r.category,price:r.price,stock:r.stock,sku:r.sku,active:r.active};
-      } else {
-        updated.push({id:"p"+uid(),name:r.name,category:r.category,price:r.price,stock:r.stock,sku:r.sku,active:r.active,image:""});
-      }
+      if(r._action==="update"&&r._matchId){const idx=updated.findIndex(p=>p.id===r._matchId);if(idx!==-1)updated[idx]={...updated[idx],name:r.name,category:r.category,price:r.price,stock:r.stock,sku:r.sku,active:r.active};}
+      else updated.push({id:"p"+uid(),name:r.name,category:r.category,price:r.price,stock:r.stock,sku:r.sku,active:r.active,image:""});
     });
     await saveField("products",updated);
     if(newCats.length>categories.length)await saveField("categories",newCats);
@@ -668,19 +656,69 @@ function Inventory({store,data,session,saveField,primary}){
   };
 
   const filtered=products.filter(p=>(catFilter==="All"||p.category===catFilter)&&(p.name.toLowerCase().includes(search.toLowerCase())||p.sku?.includes(search)));
+  const fmt=(n)=>`₱${Number(n||0).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 
   return(
     <div>
+      {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
-        <div style={{fontWeight:800,fontSize:18}}>Inventory <span style={{fontSize:13,fontWeight:600,color:"#9ca3af"}}>({products.filter(p=>p.active).length} active)</span></div>
+        <div style={{fontWeight:800,fontSize:18}}>Inventory <span style={{fontSize:13,fontWeight:600,color:"#9ca3af"}}>({products.filter(p=>p.active).length} active / {products.length} total)</span></div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search products…" style={{...INP,width:180,padding:"7px 12px"}}/>
-          <button onClick={exportCSV} title="Export as CSV" style={{padding:"7px 10px",border:"1px solid #e5e7eb",borderRadius:8,cursor:"pointer",fontSize:12,background:"#f9fafb",display:"flex",alignItems:"center",gap:4}}><i className="ti ti-download"/>Export</button>
-          <button onClick={()=>csvRef.current.click()} title="Import from CSV" style={{padding:"7px 10px",border:`1px solid ${primary||"#4f46e5"}`,borderRadius:8,cursor:"pointer",fontSize:12,background:"#f5f3ff",color:primary||"#4f46e5",fontWeight:700,display:"flex",alignItems:"center",gap:4}}><i className="ti ti-upload"/>Import</button>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name or SKU…" style={{...INP,width:180,padding:"7px 12px"}}/>
+          <button onClick={exportCSV} style={{padding:"7px 10px",border:"1px solid #e5e7eb",borderRadius:8,cursor:"pointer",fontSize:12,background:"#f9fafb",display:"flex",alignItems:"center",gap:4}}><i className="ti ti-download"/>Export</button>
+          <button onClick={()=>csvRef.current.click()} style={{padding:"7px 10px",border:`1px solid ${primary||"#4f46e5"}`,borderRadius:8,cursor:"pointer",fontSize:12,background:"#f5f3ff",color:primary||"#4f46e5",fontWeight:700,display:"flex",alignItems:"center",gap:4}}><i className="ti ti-upload"/>Import</button>
           <input ref={csvRef} type="file" accept=".csv" onChange={handleCSVFile} style={{display:"none"}}/>
-          <button onClick={openAdd} style={{padding:"7px 14px",background:primary||"#4f46e5",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}}><i className="ti ti-plus"/>Add Product</button>
+          <button onClick={openAdd} style={{padding:"7px 14px",background:primary||"#4f46e5",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:5}}><i className="ti ti-plus"/>Add Product</button>
         </div>
       </div>
+
+      {/* Category filters */}
+      <div style={{display:"flex",gap:5,marginBottom:14,flexWrap:"wrap"}}>
+        {["All",...categories].map(c=>(
+          <button key={c} onClick={()=>setCat(c)} style={{padding:"4px 12px",borderRadius:20,border:"1.5px solid",cursor:"pointer",fontSize:12,fontWeight:700,borderColor:catFilter===c?(primary||"#4f46e5"):"#e5e7eb",background:catFilter===c?(primary||"#4f46e5"):"#fff",color:catFilter===c?"#fff":"#6b7280"}}>{c}</button>
+        ))}
+      </div>
+
+      {/* Product table */}
+      <Card style={{padding:0,overflow:"hidden"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+          <thead>
+            <tr style={{background:"#f9fafb"}}>
+              {["Product","Category","Price","Stock","SKU","Status",""].map(h=>(
+                <th key={h} style={{padding:"9px 12px",textAlign:"left",fontWeight:700,fontSize:11,color:"#6b7280",borderBottom:"1px solid #e5e7eb"}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map(p=>(
+              <tr key={p.id} style={{borderBottom:"0.5px solid #f3f4f6"}}>
+                <td style={{padding:"10px 12px"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{width:36,height:36,borderRadius:8,overflow:"hidden",background:"#f3f4f6",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      {p.image?<img src={p.image} alt={p.name} style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<i className="ti ti-photo" style={{fontSize:16,color:"#d1d5db"}}/>}
+                    </div>
+                    <span style={{fontWeight:600}}>{p.name}</span>
+                  </div>
+                </td>
+                <td style={{padding:"10px 12px",color:"#6b7280"}}>{p.category}</td>
+                <td style={{padding:"10px 12px",fontWeight:700,color:primary||"#4f46e5"}}>{fmt(p.price)}</td>
+                <td style={{padding:"10px 12px"}}><span style={{fontWeight:700,color:p.stock===0?"#dc2626":p.stock<10?"#f59e0b":"#111"}}>{p.stock}</span></td>
+                <td style={{padding:"10px 12px",fontFamily:"monospace",fontSize:11,color:"#6b7280"}}>{p.sku||"—"}</td>
+                <td style={{padding:"10px 12px"}}>
+                  <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10,background:p.active?"#f0fdf4":"#fef2f2",color:p.active?"#166534":"#991b1b"}}>{p.active?"Active":"Hidden"}</span>
+                </td>
+                <td style={{padding:"10px 12px"}}>
+                  <div style={{display:"flex",gap:5}}>
+                    <button onClick={()=>openEdit(p)} style={{padding:"4px 10px",background:primary||"#4f46e5",color:"#fff",border:"none",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:700}}>Edit</button>
+                    <button onClick={()=>{setDeleteModal(p);setDeleteReason("");}} style={{padding:"4px 8px",background:"#fef2f2",color:"#dc2626",border:"1px solid #fecaca",borderRadius:6,cursor:"pointer",fontSize:11}}><i className="ti ti-trash" style={{fontSize:12}}/></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {filtered.length===0&&<tr><td colSpan={7} style={{padding:"40px",textAlign:"center",color:"#9ca3af"}}>No products found</td></tr>}
+          </tbody>
+        </table>
+      </Card>
 
       {/* CSV Import Modal */}
       {importModal&&(
@@ -704,69 +742,73 @@ function Inventory({store,data,session,saveField,primary}){
                 </tr>)}</tbody>
               </table>
             </div>
-            <div style={{fontSize:11,color:"#9ca3af",marginBottom:14}}>SKU match → update · Exact name match → update · No match → create new</div>
             <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>{setImportModal(false);setImportRows([]);setImportErrors([]);}} style={{flex:1,padding:"10px 0",border:"1px solid #e5e7eb",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700}}>Cancel</button>
-              <button onClick={doImport} disabled={importing||importRows.length===0} style={{flex:2,padding:"10px 0",background:importing?"#a5b4fc":(primary||"#4f46e5"),color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:800}}>{importing?"Importing…":`Confirm Import (${importRows.length} rows)`}</button>
+              <button onClick={()=>{setImportModal(false);setImportRows([]);}} style={{flex:1,padding:"10px 0",border:"1px solid #e5e7eb",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700}}>Cancel</button>
+              <button onClick={doImport} disabled={importing} style={{flex:2,padding:"10px 0",background:importing?"#a5b4fc":(primary||"#4f46e5"),color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:800}}>{importing?"Importing…":`Confirm (${importRows.length} rows)`}</button>
             </div>
           </div>
         </div>
       )}
-      {/* Category filters */}
-      <div style={{display:"flex",gap:5,marginBottom:14,flexWrap:"wrap"}}>
-        {["All",...categories].map(c=><button key={c} onClick={()=>setCat(c)} style={{padding:"3px 12px",borderRadius:20,border:"1.5px solid",cursor:"pointer",fontSize:12,fontWeight:700,borderColor:catFilter===c?(primary||"#4f46e5"):"#e5e7eb",background:catFilter===c?(primary||"#4f46e5"):"#fff",color:catFilter===c?"#fff":"#6b7280"}}>{c}</button>)}
-      </div>
-      <Card style={{padding:0,overflow:"hidden"}}>
-        <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,minWidth:520}}>
-            <thead><tr style={{background:"#f9fafb"}}>{["Product","Category","Price","Stock","SKU","Status",""].map(h=><th key={h} style={{padding:"9px 14px",textAlign:"left",fontWeight:700,fontSize:11,color:"#6b7280",borderBottom:"1px solid #e5e7eb",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
-            <tbody>
-              {filtered.map(p=>(
-                <tr key={p.id} style={{borderBottom:"1px solid #f3f4f6",opacity:p.active?1:0.5}}>
-                  <td style={{padding:"10px 14px",fontWeight:700}}>{p.name}</td>
-                  <td style={{padding:"10px 14px",color:"#6b7280"}}>{p.category}</td>
-                  <td style={{padding:"10px 14px",fontWeight:800,color:primary||"#4f46e5"}}>{fmt(p.price)}</td>
-                  <td style={{padding:"10px 14px"}}><span style={{fontWeight:800,color:p.stock<=0?"#ef4444":p.stock<=5?"#f59e0b":"#111"}}>{p.stock}</span></td>
-                  <td style={{padding:"10px 14px",fontFamily:"monospace",fontSize:11,color:"#9ca3af"}}>{p.sku||"—"}</td>
-                  <td style={{padding:"10px 14px"}}><span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10,background:p.active?"#f0fdf4":"#fef2f2",color:p.active?"#166534":"#991b1b"}}>{p.active?"Active":"Hidden"}</span></td>
-                  <td style={{padding:"10px 14px"}}><button onClick={()=>openEdit(p)} style={{background:"none",border:"1px solid #e5e7eb",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontSize:12,color:"#6b7280"}}>Edit</button></td>
-                </tr>
-              ))}
-              {filtered.length===0&&<tr><td colSpan={7} style={{padding:"32px",textAlign:"center",color:"#9ca3af",fontSize:13}}>No products found</td></tr>}
-            </tbody>
-          </table>
+
+      {/* Delete Confirmation Modal */}
+      {deleteModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div style={{background:"#fff",borderRadius:16,padding:24,width:"100%",maxWidth:400}}>
+            <div style={{fontWeight:800,fontSize:16,marginBottom:4,color:"#dc2626"}}>Delete Product</div>
+            <div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,padding:"10px 14px",marginBottom:14,fontSize:13,color:"#991b1b"}}>
+              Are you sure you want to delete <b>{deleteModal.name}</b>? This cannot be undone.
+            </div>
+            <FRow label="Reason" hint="optional">
+              <input value={deleteReason} onChange={e=>setDeleteReason(e.target.value)} placeholder="e.g. Discontinued, Duplicate…" style={INP} autoFocus/>
+            </FRow>
+            <div style={{display:"flex",gap:8,marginTop:14}}>
+              <button onClick={()=>setDeleteModal(null)} style={{flex:1,padding:"10px 0",border:"1px solid #e5e7eb",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700}}>Cancel</button>
+              <button onClick={doDelete} disabled={deleting} style={{flex:1,padding:"10px 0",background:deleting?"#fca5a5":"#dc2626",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:800}}>{deleting?"Deleting…":"Delete"}</button>
+            </div>
+          </div>
         </div>
-      </Card>
+      )}
 
       {/* Add / Edit Modal */}
       {modal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:500,padding:16}} onClick={e=>e.target===e.currentTarget&&setModal(null)}>
-          <div style={{background:"#fff",borderRadius:14,padding:24,width:"100%",maxWidth:400,maxHeight:"90vh",overflowY:"auto"}}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div style={{background:"#fff",borderRadius:16,padding:24,width:"100%",maxWidth:480,maxHeight:"90vh",overflow:"auto"}}>
             <div style={{fontWeight:800,fontSize:16,marginBottom:16}}>{modal==="add"?"Add Product":"Edit Product"}</div>
-            <div style={{display:"flex",flexDirection:"column",gap:12}}>
-              <FRow label="Product Name"><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="e.g. Chicken Adobo" style={INP} autoFocus/></FRow>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                <FRow label="Price (₱)"><input type="number" value={form.price} onChange={e=>setForm(f=>({...f,price:e.target.value}))} placeholder="0.00" style={INP}/></FRow>
-                <FRow label="Stock"><input type="number" value={form.stock} onChange={e=>setForm(f=>({...f,stock:e.target.value}))} placeholder="0" style={INP}/></FRow>
+            <FRow label="Product Image">
+              <div style={{display:"flex",alignItems:"center",gap:12,marginTop:4}}>
+                <div style={{width:64,height:64,borderRadius:10,border:"2px dashed #e5e7eb",overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",background:"#f9fafb",flexShrink:0}}>
+                  {form.image?<img src={form.image} alt="product" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<i className="ti ti-photo" style={{fontSize:22,color:"#d1d5db"}}/>}
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  <button onClick={()=>imgRef.current.click()} style={{padding:"6px 12px",border:"1px solid #e5e7eb",borderRadius:7,cursor:"pointer",fontSize:12,background:"#f9fafb",fontWeight:700,display:"flex",alignItems:"center",gap:5}}><i className="ti ti-upload"/>Upload</button>
+                  {form.image&&<button onClick={()=>setForm(f=>({...f,image:""}))} style={{padding:"4px 10px",border:"1px solid #fecaca",borderRadius:7,cursor:"pointer",fontSize:11,background:"#fef2f2",color:"#991b1b"}}>Remove</button>}
+                </div>
+                <input ref={imgRef} type="file" accept="image/*" onChange={handleImg} style={{display:"none"}}/>
               </div>
-              <FRow label="Category">
-                <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} style={INP}>
-                  {categories.map(c=><option key={c} value={c}>{c}</option>)}
-                </select>
-              </FRow>
-              <FRow label="SKU" hint="Auto-generated">
-                <input value={form.sku||""} readOnly style={{...INP,background:"#f3f4f6",color:"#6b7280",fontFamily:"monospace"}}/>
-              </FRow>
+            </FRow>
+            <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:10}}>
+              <FRow label="Name"><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Product name" style={INP} autoFocus/></FRow>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <FRow label="Category">
+                  <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} style={INP}>
+                    {categories.map(c=><option key={c}>{c}</option>)}
+                  </select>
+                </FRow>
+                <FRow label="Price (₱)"><input type="number" value={form.price} onChange={e=>setForm(f=>({...f,price:e.target.value}))} style={INP}/></FRow>
+              </div>
+              <FRow label="Stock"><input type="number" value={form.stock} onChange={e=>setForm(f=>({...f,stock:e.target.value}))} style={INP}/></FRow>
+              <FRow label="SKU"><input value={form.sku} onChange={e=>setForm(f=>({...f,sku:e.target.value.toUpperCase()}))} style={{...INP,fontFamily:"monospace"}}/></FRow>
               <FRow label="Status">
                 <select value={form.active?"active":"hidden"} onChange={e=>setForm(f=>({...f,active:e.target.value==="active"}))} style={INP}>
-                  <option value="active">Active</option><option value="hidden">Hidden</option>
+                  <option value="active">Active</option>
+                  <option value="hidden">Hidden</option>
                 </select>
               </FRow>
-            </div>
-            {msg&&<div style={{marginTop:10,fontSize:13,fontWeight:700,color:msg==="Saved!"?"#166534":"#991b1b"}}>{msg}</div>}
-            <div style={{display:"flex",gap:8,marginTop:16}}>
-              <button onClick={()=>setModal(null)} style={{flex:1,padding:"10px 0",border:"1px solid #e5e7eb",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700}}>Cancel</button>
-              <button onClick={save} disabled={saving} style={{flex:2,padding:"10px 0",background:saving?"#a5b4fc":(primary||"#4f46e5"),color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:800}}>{saving?"Saving…":modal==="add"?"Add Product":"Save Changes"}</button>
+              {msg&&<div style={{fontSize:12,color:msg==="Saved!"?"#166534":"#dc2626",fontWeight:700}}>{msg}</div>}
+              <div style={{display:"flex",gap:8,marginTop:4}}>
+                <button onClick={()=>setModal(null)} style={{flex:1,padding:"10px 0",border:"1px solid #e5e7eb",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700}}>Cancel</button>
+                <button onClick={save} disabled={saving} style={{flex:2,padding:"10px 0",background:saving?"#a5b4fc":(primary||"#4f46e5"),color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:800}}>{saving?"Saving…":modal==="add"?"Add Product":"Save Changes"}</button>
+              </div>
             </div>
           </div>
         </div>
