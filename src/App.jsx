@@ -1010,7 +1010,7 @@ function Settings({store,data,session,saveField,onRefresh,setStore}){
   const delOrderSource=(id)=>setOsForm(f=>({...f,orderSources:f.orderSources.filter(s=>s.id!==id)}));
 
   const FONTS=["sans-serif","Arial","Georgia","Courier New","Trebuchet MS","Verdana"];
-  const TABS=[{k:"appearance",l:"Appearance"},{k:"orders",l:"Order Settings"},{k:"sku",l:"SKU"}];
+  const TABS=[{k:"appearance",l:"Appearance"},{k:"orders",l:"Order Settings"},{k:"sku",l:"SKU"},{k:"devices",l:"Devices"}];
   const rBg=parseInt(themeForm.borderRadius);
 
   return(
@@ -1149,6 +1149,148 @@ function Settings({store,data,session,saveField,onRefresh,setStore}){
             {saving?<><i className="ti ti-loader-2"/>Saving…</>:saved==="sku"?<><i className="ti ti-check"/>Saved!</>:<><i className="ti ti-device-floppy"/>Save SKU Settings</>}
           </button>
         </Card>
+      )}
+
+      {/* ── DEVICES ── */}
+      {sTab==="devices"&&(
+        <DevicesTab store={store} session={session} onRefresh={onRefresh}/>
+      )}
+    </div>
+  );
+}
+
+function DevicesTab({store,session,onRefresh}){
+  const [devices,setDevices]=useState(store?.devices||[]);
+  const [otpModal,setOtpModal]=useState(null); // null | {deviceId, deviceName}
+  const [otp,setOtp]=useState("");
+  const [otpSent,setOtpSent]=useState(false);
+  const [loading,setLoading]=useState(false);
+  const [error,setError]=useState("");
+  const [success,setSuccess]=useState("");
+
+  // Reload devices from store whenever store changes
+  useEffect(()=>{ setDevices(store?.devices||[]); },[store]);
+
+  const sendRemoveOTP=async(device)=>{
+    setLoading(true);setError("");setSuccess("");
+    // Reuse portal OTP system — sends to owner email
+    const result=await sendPortalOTP(session.email, store?.store_name||"POS Pro","device");
+    setLoading(false);
+    if(!result.ok){setError("Failed to send code. Check your connection.");return;}
+    setOtpSent(true);
+    setOtpModal(device);
+    setOtp("");
+    setSuccess(result.dev?"[DEV] Check console for OTP":"Code sent to your email!");
+  };
+
+  const confirmRemove=async()=>{
+    if(!otp||otp.length<6){setError("Enter the 6-digit code");return;}
+    setLoading(true);setError("");
+    // Verify OTP
+    const valid=await verifyPortalOTP(session.email,otp.trim());
+    if(!valid){setError("Invalid or expired code.");setLoading(false);return;}
+    // Remove device from stores.devices
+    const updated=(store?.devices||[]).filter(d=>d.id!==otpModal.id);
+    const ok=await supa.update("stores",{id:session.storeId},{devices:updated});
+    setLoading(false);
+    if(!ok){setError("Failed to remove device. Try again.");return;}
+    setDevices(updated);
+    setOtpModal(null);setOtp("");setOtpSent(false);
+    setSuccess(`"${otpModal.name}" has been removed.`);
+    if(onRefresh) onRefresh();
+  };
+
+  const fmtDate=(s)=>{if(!s)return"—";try{return new Date(s).toLocaleDateString("en-PH",{year:"numeric",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});}catch{return s;}};
+  const maxDevices=store?.max_devices||1;
+
+  return(
+    <div>
+      <Card>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:8}}>
+          <div>
+            <div style={{fontWeight:800,fontSize:15}}>Registered Devices</div>
+            <div style={{fontSize:12,color:"#9ca3af",marginTop:2}}>{devices.length} of {maxDevices} slots used</div>
+          </div>
+          <div style={{fontSize:11,background:"#f0fdf4",color:"#166534",padding:"4px 12px",borderRadius:20,fontWeight:700,border:"1px solid #bbf7d0"}}>
+            Plan: {maxDevices} device{maxDevices>1?"s":""}
+          </div>
+        </div>
+
+        {success&&<div style={{padding:"9px 12px",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:8,fontSize:13,color:"#166534",marginBottom:14,display:"flex",alignItems:"center",gap:7}}><i className="ti ti-check"/>{success}</div>}
+
+        {devices.length===0&&(
+          <div style={{textAlign:"center",padding:"32px 0",color:"#9ca3af"}}>
+            <i className="ti ti-device-desktop" style={{fontSize:36,display:"block",marginBottom:8}}/>
+            <div style={{fontSize:13}}>No devices registered yet</div>
+            <div style={{fontSize:11,marginTop:4}}>Devices appear here when the POS app is activated</div>
+          </div>
+        )}
+
+        {devices.map(d=>(
+          <div key={d.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 16px",background:"#f9fafb",borderRadius:10,border:"1px solid #e5e7eb",marginBottom:10}}>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:40,height:40,borderRadius:10,background:"#ede9fe",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <i className="ti ti-device-desktop" style={{fontSize:20,color:"#4f46e5"}}/>
+              </div>
+              <div>
+                <div style={{fontWeight:700,fontSize:14}}>{d.name||"Unnamed Device"}</div>
+                <div style={{fontSize:11,color:"#9ca3af",marginTop:2}}>
+                  {d.type==="branch"?"Branch Store":"Connected POS"} · ID: <span style={{fontFamily:"monospace"}}>{d.id?.slice(-8)}</span>
+                </div>
+                <div style={{fontSize:11,color:"#9ca3af"}}>Last seen: {fmtDate(d.last_seen_at)}</div>
+              </div>
+            </div>
+            <button onClick={()=>sendRemoveOTP(d)} disabled={loading} style={{padding:"7px 14px",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,cursor:loading?"not-allowed":"pointer",fontSize:12,fontWeight:700,color:"#991b1b",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}}>
+              <i className="ti ti-trash" style={{fontSize:13}}/> Remove
+            </button>
+          </div>
+        ))}
+
+        {devices.length<maxDevices&&(
+          <div style={{padding:"14px 16px",background:"#f9fafb",borderRadius:10,border:"1.5px dashed #d1d5db",textAlign:"center",color:"#9ca3af",fontSize:12}}>
+            <i className="ti ti-plus" style={{fontSize:16,display:"block",marginBottom:4}}/>
+            {maxDevices-devices.length} slot{maxDevices-devices.length>1?"s":""} available — activate from the POS app
+          </div>
+        )}
+      </Card>
+
+      {/* OTP Confirmation Modal */}
+      {otpModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div style={{background:"#fff",borderRadius:16,padding:28,width:"100%",maxWidth:400}}>
+            <div style={{fontWeight:800,fontSize:16,marginBottom:4}}>Confirm Device Removal</div>
+            <div style={{fontSize:13,color:"#9ca3af",marginBottom:16}}>
+              To remove <b>{otpModal.name}</b>, enter the code sent to your email.
+            </div>
+            {success&&<div style={{padding:"8px 12px",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:8,fontSize:12,color:"#166534",marginBottom:12}}>{success}</div>}
+            <div style={{background:"#fef3c7",border:"1px solid #fde68a",borderRadius:8,padding:"10px 12px",marginBottom:16,fontSize:12,color:"#92400e"}}>
+              ⚠️ Removing this device will log it out immediately on next sync.
+            </div>
+            <FRow label="6-Digit Code">
+              <input
+                type="text" inputMode="numeric"
+                value={otp}
+                onChange={e=>{setOtp(e.target.value.replace(/\D/g,"").slice(0,6));setError("");}}
+                onKeyDown={e=>e.key==="Enter"&&confirmRemove()}
+                placeholder="000000"
+                style={{...INP,fontSize:24,fontWeight:800,letterSpacing:8,textAlign:"center"}}
+                autoFocus
+              />
+            </FRow>
+            <Err msg={error}/>
+            <div style={{display:"flex",gap:8,marginTop:16}}>
+              <button onClick={()=>{setOtpModal(null);setOtp("");setOtpSent(false);setError("");}} style={{flex:1,padding:"10px 0",border:"1px solid #e5e7eb",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700}}>Cancel</button>
+              <button onClick={confirmRemove} disabled={loading||otp.length<6} style={{flex:2,padding:"10px 0",background:loading||otp.length<6?"#fca5a5":"#dc2626",color:"#fff",border:"none",borderRadius:8,cursor:loading||otp.length<6?"not-allowed":"pointer",fontSize:13,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                {loading?<><i className="ti ti-loader-2"/>Verifying…</>:<><i className="ti ti-trash"/>Remove Device</>}
+              </button>
+            </div>
+            <div style={{marginTop:12,textAlign:"center"}}>
+              <button onClick={()=>sendRemoveOTP(otpModal)} disabled={loading} style={{background:"none",border:"none",cursor:"pointer",color:"#4f46e5",fontSize:12,fontWeight:600}}>
+                Resend Code
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
