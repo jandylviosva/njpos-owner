@@ -555,20 +555,23 @@ function Inventory({store,data,session,saveField,primary}){
   const skuSettings=data?.sku_settings||{prefix:"SW",suffix:"",counter:0};
   const [search,setSearch]=useState("");
   const [catFilter,setCat]=useState("All");
-  const [modal,setModal]=useState(null); // null | "add" | "edit"
+  const [modal,setModal]=useState(null);
   const [form,setForm]=useState({});
   const [saving,setSaving]=useState(false);
   const [msg,setMsg]=useState("");
+  // CSV
+  const [importModal,setImportModal]=useState(false);
+  const [importRows,setImportRows]=useState([]);
+  const [importErrors,setImportErrors]=useState([]);
+  const [importing,setImporting]=useState(false);
+  const csvRef=useRef(null);
 
   const genNextSKU=()=>{
     const counter=(skuSettings.counter||0)+1;
     return `${(skuSettings.prefix||"SW").toUpperCase()}${String(counter).padStart(5,"0")}${(skuSettings.suffix||"").toUpperCase()}`;
   };
 
-  const openAdd=()=>{
-    setForm({id:"p"+uid(),name:"",price:"",category:categories[0]||"Food",stock:0,sku:genNextSKU(),active:true,image:""});
-    setModal("add");setMsg("");
-  };
+  const openAdd=()=>{setForm({id:"p"+uid(),name:"",price:"",category:categories[0]||"Food",stock:0,sku:genNextSKU(),active:true,image:""});setModal("add");setMsg("");};
   const openEdit=(p)=>{setForm({...p,price:String(p.price),stock:String(p.stock)});setModal("edit");setMsg("");};
 
   const save=async()=>{
@@ -577,7 +580,6 @@ function Inventory({store,data,session,saveField,primary}){
     let updated;
     if(modal==="add"){
       updated=[...products,{...form,price:parseFloat(form.price)||0,stock:parseInt(form.stock)||0}];
-      // Also increment SKU counter in sku_settings
       await saveField("sku_settings",{...skuSettings,counter:(skuSettings.counter||0)+1});
     } else {
       updated=products.map(p=>p.id===form.id?{...form,price:parseFloat(form.price)||0,stock:parseInt(form.stock)||0}:p);
@@ -587,17 +589,129 @@ function Inventory({store,data,session,saveField,primary}){
     if(ok)setTimeout(()=>{setModal(null);setMsg("");},700);
   };
 
+  // ── CSV EXPORT ──
+  const exportCSV=()=>{
+    const headers=["name","category","price","stock","sku","active"];
+    const rows=products.map(p=>[
+      `"${(p.name||"").replace(/"/g,'""')}"`,
+      `"${(p.category||"").replace(/"/g,'""')}"`,
+      p.price||0, p.stock||0,
+      `"${(p.sku||"").replace(/"/g,'""')}"`,
+      p.active===false?"false":"true",
+    ].join(","));
+    const csv=[headers.join(","),...rows].join("\n");
+    const blob=new Blob([csv],{type:"text/csv"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;a.download=`inventory-${new Date().toISOString().slice(0,10)}.csv`;a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ── CSV IMPORT PARSE ──
+  const handleCSVFile=(e)=>{
+    const file=e.target.files[0];if(!file)return;
+    const reader=new FileReader();
+    reader.onload=(ev)=>{
+      const text=ev.target.result;
+      const lines=text.split("\n").map(l=>l.trim()).filter(Boolean);
+      if(lines.length<2){alert("CSV is empty or has no data rows");return;}
+      const headers=lines[0].toLowerCase().split(",").map(h=>h.trim().replace(/"/g,""));
+      const nameIdx=headers.indexOf("name"),catIdx=headers.indexOf("category"),priceIdx=headers.indexOf("price"),stockIdx=headers.indexOf("stock"),skuIdx=headers.indexOf("sku"),activeIdx=headers.indexOf("active");
+      if(nameIdx===-1||priceIdx===-1){alert("CSV must have 'name' and 'price' columns");return;}
+      const rows=[];const errors=[];
+      lines.slice(1).forEach((line,i)=>{
+        const cols=line.match(/(".*?"|[^,]+)(?=,|$)/g)||line.split(",");
+        const clean=cols.map(c=>c.trim().replace(/^"|"$/g,"").replace(/""/g,'"'));
+        const name=clean[nameIdx]?.trim()||"";
+        const price=parseFloat(clean[priceIdx])||0;
+        if(!name){errors.push(`Row ${i+2}: missing name`);return;}
+        if(price<=0){errors.push(`Row ${i+2}: invalid price for "${name}"`);return;}
+        rows.push({
+          name,
+          category:catIdx!==-1?clean[catIdx]||categories[0]||"Others":categories[0]||"Others",
+          price,stock:stockIdx!==-1?parseInt(clean[stockIdx])||0:0,
+          sku:skuIdx!==-1?clean[skuIdx]||"":"",
+          active:activeIdx!==-1?clean[activeIdx]?.toLowerCase()!=="false":true,
+          _action:"?",_matchId:null,
+        });
+      });
+      rows.forEach(r=>{
+        const bysku=r.sku&&products.find(p=>p.sku===r.sku);
+        const byname=!bysku&&products.find(p=>p.name.toLowerCase()===r.name.toLowerCase());
+        r._action=bysku||byname?"update":"create";
+        r._matchId=bysku?.id||byname?.id||null;
+      });
+      setImportRows(rows);setImportErrors(errors);setImportModal(true);e.target.value="";
+    };
+    reader.readAsText(file);
+  };
+
+  const doImport=async()=>{
+    setImporting(true);
+    let nextCounter=skuSettings.counter||0;
+    const newCats=[...categories];
+    const updated=[...products];
+    importRows.forEach(r=>{
+      if(r.category&&!newCats.includes(r.category))newCats.push(r.category);
+      if(!r.sku){nextCounter++;r.sku=`${(skuSettings.prefix||"SW").toUpperCase()}${String(nextCounter).padStart(5,"0")}${(skuSettings.suffix||"").toUpperCase()}`;}
+      if(r._action==="update"&&r._matchId){
+        const idx=updated.findIndex(p=>p.id===r._matchId);
+        if(idx!==-1)updated[idx]={...updated[idx],name:r.name,category:r.category,price:r.price,stock:r.stock,sku:r.sku,active:r.active};
+      } else {
+        updated.push({id:"p"+uid(),name:r.name,category:r.category,price:r.price,stock:r.stock,sku:r.sku,active:r.active,image:""});
+      }
+    });
+    await saveField("products",updated);
+    if(newCats.length>categories.length)await saveField("categories",newCats);
+    await saveField("sku_settings",{...skuSettings,counter:nextCounter});
+    setImporting(false);setImportModal(false);setImportRows([]);setImportErrors([]);
+  };
+
   const filtered=products.filter(p=>(catFilter==="All"||p.category===catFilter)&&(p.name.toLowerCase().includes(search.toLowerCase())||p.sku?.includes(search)));
 
   return(
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
         <div style={{fontWeight:800,fontSize:18}}>Inventory <span style={{fontSize:13,fontWeight:600,color:"#9ca3af"}}>({products.filter(p=>p.active).length} active)</span></div>
-        <div style={{display:"flex",gap:8}}>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search products…" style={{...INP,width:200,padding:"7px 12px"}}/>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search products…" style={{...INP,width:180,padding:"7px 12px"}}/>
+          <button onClick={exportCSV} title="Export as CSV" style={{padding:"7px 10px",border:"1px solid #e5e7eb",borderRadius:8,cursor:"pointer",fontSize:12,background:"#f9fafb",display:"flex",alignItems:"center",gap:4}}><i className="ti ti-download"/>Export</button>
+          <button onClick={()=>csvRef.current.click()} title="Import from CSV" style={{padding:"7px 10px",border:`1px solid ${primary||"#4f46e5"}`,borderRadius:8,cursor:"pointer",fontSize:12,background:"#f5f3ff",color:primary||"#4f46e5",fontWeight:700,display:"flex",alignItems:"center",gap:4}}><i className="ti ti-upload"/>Import</button>
+          <input ref={csvRef} type="file" accept=".csv" onChange={handleCSVFile} style={{display:"none"}}/>
           <button onClick={openAdd} style={{padding:"7px 14px",background:primary||"#4f46e5",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}}><i className="ti ti-plus"/>Add Product</button>
         </div>
       </div>
+
+      {/* CSV Import Modal */}
+      {importModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div style={{background:"#fff",borderRadius:16,padding:24,width:"100%",maxWidth:560,maxHeight:"85vh",overflow:"auto"}}>
+            <div style={{fontWeight:800,fontSize:16,marginBottom:4}}>Import Preview — {importRows.length} rows</div>
+            {importErrors.length>0&&<div style={{background:"#fef3c7",border:"1px solid #fde68a",borderRadius:8,padding:"8px 12px",marginBottom:12,fontSize:12,color:"#92400e"}}>{importErrors.length} rows skipped: {importErrors.join(", ")}</div>}
+            <div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:8,padding:"8px 12px",marginBottom:12,display:"flex",gap:16,fontSize:13}}>
+              <span><b>{importRows.filter(r=>r._action==="create").length}</b> will be created</span>
+              <span><b>{importRows.filter(r=>r._action==="update").length}</b> will be updated</span>
+            </div>
+            <div style={{maxHeight:240,overflowY:"auto",marginBottom:14}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                <thead><tr style={{background:"#f9fafb"}}>{["Action","Name","Category","Price","Stock"].map(h=><th key={h} style={{padding:"6px 8px",textAlign:"left",fontWeight:700,fontSize:10,color:"#6b7280",borderBottom:"1px solid #e5e7eb"}}>{h}</th>)}</tr></thead>
+                <tbody>{importRows.map((r,i)=><tr key={i} style={{borderBottom:"0.5px solid #f3f4f6"}}>
+                  <td style={{padding:"6px 8px"}}><span style={{fontSize:10,fontWeight:700,padding:"2px 6px",borderRadius:8,background:r._action==="create"?"#f0fdf4":"#dbeafe",color:r._action==="create"?"#166534":"#1e40af"}}>{r._action}</span></td>
+                  <td style={{padding:"6px 8px",fontWeight:600}}>{r.name}</td>
+                  <td style={{padding:"6px 8px",color:"#6b7280"}}>{r.category}</td>
+                  <td style={{padding:"6px 8px"}}>₱{r.price}</td>
+                  <td style={{padding:"6px 8px"}}>{r.stock}</td>
+                </tr>)}</tbody>
+              </table>
+            </div>
+            <div style={{fontSize:11,color:"#9ca3af",marginBottom:14}}>SKU match → update · Exact name match → update · No match → create new</div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>{setImportModal(false);setImportRows([]);setImportErrors([]);}} style={{flex:1,padding:"10px 0",border:"1px solid #e5e7eb",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700}}>Cancel</button>
+              <button onClick={doImport} disabled={importing||importRows.length===0} style={{flex:2,padding:"10px 0",background:importing?"#a5b4fc":(primary||"#4f46e5"),color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:800}}>{importing?"Importing…":`Confirm Import (${importRows.length} rows)`}</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Category filters */}
       <div style={{display:"flex",gap:5,marginBottom:14,flexWrap:"wrap"}}>
         {["All",...categories].map(c=><button key={c} onClick={()=>setCat(c)} style={{padding:"3px 12px",borderRadius:20,border:"1.5px solid",cursor:"pointer",fontSize:12,fontWeight:700,borderColor:catFilter===c?(primary||"#4f46e5"):"#e5e7eb",background:catFilter===c?(primary||"#4f46e5"):"#fff",color:catFilter===c?"#fff":"#6b7280"}}>{c}</button>)}
