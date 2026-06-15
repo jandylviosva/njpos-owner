@@ -239,7 +239,7 @@ export default function App(){
 
 // ════════════ LOGIN ════════════
 function LoginScreen({onLogin}){
-  const [screen,setScreen]=useState("email"); // email | otp
+  const [screen,setScreen]=useState("email");
   const [email,setEmail]=useState("");
   const [otp,setOtp]=useState("");
   const [loading,setLoading]=useState(false);
@@ -256,13 +256,13 @@ function LoginScreen({onLogin}){
 
   const sendOTP=async()=>{
     if(!email.trim()||!/\S+@\S+\.\S+/.test(email)){setError("Enter a valid email address");return;}
-    setLoading(true);setError("");setInfo("Checking email...");
+    setLoading(true);setError("");setInfo("Checking...");
     const store=await supa.get("stores",{owner_email:email.trim().toLowerCase()});
     if(!store){setError("No account found with this email.");setLoading(false);setInfo("");return;}
     const result=await sendPortalOTP(email.trim().toLowerCase(),store.store_name,"sign-in");
     setLoading(false);
     if(!result.ok){setError("Failed to send code. Try again.");setInfo("");return;}
-    setInfo(result.dev?"[DEV] Check browser console for OTP":"Code sent! Check your email.");
+    setInfo(result.dev?"[DEV] Check browser console for code":"Code sent! Check your email.");
     setScreen("otp");startCountdown();
   };
 
@@ -270,7 +270,7 @@ function LoginScreen({onLogin}){
     if(!otp||otp.length<6){setError("Enter the 6-digit code");return;}
     setLoading(true);setError("");
     const valid=await verifyPortalOTP(email.trim().toLowerCase(),otp.trim());
-    if(!valid){setError("Invalid or expired code. Request a new one.");setLoading(false);return;}
+    if(!valid){setError("Invalid or expired code.");setLoading(false);return;}
     const store=await supa.get("stores",{owner_email:email.trim().toLowerCase()});
     if(!store){setError("Store not found.");setLoading(false);return;}
     clearInterval(timerRef.current);
@@ -288,27 +288,23 @@ function LoginScreen({onLogin}){
           <div style={{fontSize:12,color:"rgba(255,255,255,0.45)",marginTop:3}}>Owner Portal</div>
         </div>
         <div style={{background:"#fff",borderRadius:20,padding:"28px 28px 24px",boxShadow:"0 24px 60px rgba(0,0,0,0.4)"}}>
-
           {screen==="email"&&(<>
             <div style={{fontWeight:800,fontSize:17,marginBottom:4}}>Sign In</div>
-            <div style={{fontSize:13,color:"#9ca3af",marginBottom:20}}>Enter your owner email — we'll send a sign-in code</div>
-            <FRow label="Owner Email">
-              <input type="email" value={email} onChange={e=>{setEmail(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&sendOTP()} placeholder="owner@email.com" style={INP} autoFocus/>
-            </FRow>
+            <div style={{fontSize:13,color:"#9ca3af",marginBottom:20}}>Enter your owner email — we\'ll send a sign-in code</div>
+            <FRow label="Owner Email"><input type="email" value={email} onChange={e=>{setEmail(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&sendOTP()} placeholder="owner@email.com" style={INP} autoFocus/></FRow>
             <Err msg={error}/>
             {info&&<div style={{marginTop:8,padding:"8px 12px",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:8,fontSize:12,color:"#166534"}}>{info}</div>}
             <button onClick={sendOTP} disabled={loading} style={{width:"100%",marginTop:16,padding:"12px 0",background:loading?"#a5b4fc":"#4f46e5",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
               {loading?<><i className="ti ti-loader-2" style={{fontSize:17}}/>Sending…</>:<><i className="ti ti-mail" style={{fontSize:17}}/>Send Sign-In Code</>}
             </button>
           </>)}
-
           {screen==="otp"&&(<>
             <button onClick={()=>{setScreen("email");setOtp("");setError("");setInfo("");clearInterval(timerRef.current);}} style={{display:"flex",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",color:"#6b7280",fontSize:12,fontWeight:600,marginBottom:14,padding:0}}>
               <i className="ti ti-arrow-left" style={{fontSize:14}}/> Back
             </button>
             <div style={{fontWeight:800,fontSize:17,marginBottom:4}}>Enter Your Code</div>
             <div style={{fontSize:13,color:"#9ca3af",marginBottom:6}}>Code sent to:</div>
-            <div style={{fontSize:14,fontWeight:700,color:"#4f46e5",marginBottom:16}}>{email}</div>
+            <div style={{fontSize:14,fontWeight:700,color:"#4f46e5",marginBottom:14}}>{email}</div>
             {info&&<div style={{marginBottom:12,padding:"8px 12px",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:8,fontSize:12,color:"#166534"}}>{info}</div>}
             <FRow label="6-Digit Code">
               <input type="text" inputMode="numeric" value={otp} onChange={e=>{setOtp(e.target.value.replace(/\D/g,"").slice(0,6));setError("");}} onKeyDown={e=>e.key==="Enter"&&verifyOTP()} placeholder="000000" style={{...INP,fontSize:26,fontWeight:800,letterSpacing:8,textAlign:"center"}} autoFocus/>
@@ -321,9 +317,8 @@ function LoginScreen({onLogin}){
               {countdown>0?`Resend code in ${countdown}s`:<button onClick={()=>{setOtp("");sendOTP();}} style={{background:"none",border:"none",cursor:"pointer",color:"#4f46e5",fontSize:12,fontWeight:700}}>Resend Code</button>}
             </div>
           </>)}
-
         </div>
-        <div style={{marginTop:14,textAlign:"center",fontSize:11,color:"rgba(255,255,255,0.25)"}}>POS Pro Owner Portal</div>
+        <div style={{marginTop:14,textAlign:"center",fontSize:11,color:"rgba(255,255,255,0.25)"}}>POS Pro Owner Portal · pospro-portal.com</div>
       </div>
     </div>
   );
@@ -414,7 +409,6 @@ function Reports({store,data,primary}){
   const [birMonth,setBirMonth]=useState(new Date().toISOString().slice(0,7));
   const allOrders=(data?.orders||[]).filter(o=>o.status==="paid");
   const shifts=data?.shifts||[];
-  const products=data?.products||[];
   const inPeriod=o=>{
     if(period==="today")  return o.dateKey===todayKey();
     if(period==="week")   return o.dateKey>=weekStart();
@@ -434,7 +428,7 @@ function Reports({store,data,primary}){
   const typeS={};orders.forEach(o=>{if(o.orderType){typeS[o.orderType]=(typeS[o.orderType]||0)+o.total;}});
   const PERIODS=[{k:"today",l:"Today"},{k:"week",l:"Week"},{k:"month",l:"Month"},{k:"all",l:"All"},{k:"custom",l:"Custom"}];
   const periodLabel=PERIODS.find(p=>p.k===period)?.l||period;
-  // BIR calculations
+  // BIR
   const birOrders=allOrders.filter(o=>o.dateKey?.startsWith(birMonth));
   const birGross=birOrders.reduce((s,o)=>s+o.total,0);
   const birVat=birOrders.reduce((s,o)=>s+(o.vatAmt||0),0);
@@ -445,14 +439,14 @@ function Reports({store,data,primary}){
     const cRows=Object.entries(cashierS).map(([n,d])=>`<tr><td>${n}</td><td class="right">${d.n}</td><td class="right bold">${fmt(d.rev)}</td></tr>`).join("");
     const oRows=orders.slice(0,100).map(o=>`<tr><td style="font-family:monospace;font-size:11px">${o.id}</td><td>${o.date}</td><td>${o.cashier}</td><td>${o.payMethod?.toUpperCase()}</td><td class="right bold">${fmt(o.total)}</td></tr>`).join("");
     const payRows=Object.entries(payBreakdown).filter(([,v])=>v>0).map(([k,v])=>`<tr><td>${k.toUpperCase()}</td><td class="right bold">${fmt(v)}</td></tr>`).join("");
-    printReport(`<h1>Sales Report — ${periodLabel}${payFilter!=="all"?` (${payFilter.toUpperCase()})`:""}</h1><p class="meta">Store: ${store?.store_name} | Generated: ${new Date().toLocaleString("en-PH")} | ${orders.length} orders</p><div class="summary"><div class="card"><div class="card-label">Total Sales</div><div class="card-val">${fmt(totalSales)}</div></div><div class="card"><div class="card-label">Orders</div><div class="card-val">${orders.length}</div></div><div class="card"><div class="card-label">Avg Order</div><div class="card-val">${fmt(avg)}</div></div></div>${payRows?`<h2>By Payment Method</h2><table><thead><tr><th>Method</th><th class="right">Total</th></tr></thead><tbody>${payRows}</tbody></table>`:""}${topProds.length?`<h2>Top Products</h2><table><thead><tr><th>Product</th><th class="right">Qty</th><th class="right">Revenue</th></tr></thead><tbody>${pRows}</tbody></table>`:""}${Object.keys(cashierS).length?`<h2>By Cashier</h2><table><thead><tr><th>Cashier</th><th class="right">Orders</th><th class="right">Revenue</th></tr></thead><tbody>${cRows}</tbody></table>`:""}${orders.length?`<h2>Orders ${orders.length>100?"(first 100)":""}</h2><table><thead><tr><th>Order ID</th><th>Date</th><th>Cashier</th><th>Payment</th><th class="right">Total</th></tr></thead><tbody>${oRows}</tbody></table>`:""}`,`Sales Report — ${store?.store_name}`);
+    printReport(`<h1>Sales Report — ${periodLabel}${payFilter!=="all"?` · ${payFilter.toUpperCase()}`:""}</h1><p class="meta">Store: ${store?.store_name} | ${new Date().toLocaleString("en-PH")} | ${orders.length} orders</p><div class="summary"><div class="card"><div class="card-label">Total Sales</div><div class="card-val">${fmt(totalSales)}</div></div><div class="card"><div class="card-label">Orders</div><div class="card-val">${orders.length}</div></div><div class="card"><div class="card-label">Avg Order</div><div class="card-val">${fmt(avg)}</div></div></div>${payRows?`<h2>By Payment Method</h2><table><thead><tr><th>Method</th><th class="right">Total</th></tr></thead><tbody>${payRows}</tbody></table>`:""}${topProds.length?`<h2>Top Products</h2><table><thead><tr><th>Product</th><th class="right">Qty</th><th class="right">Revenue</th></tr></thead><tbody>${pRows}</tbody></table>`:""}${Object.keys(cashierS).length?`<h2>By Cashier</h2><table><thead><tr><th>Cashier</th><th class="right">Orders</th><th class="right">Revenue</th></tr></thead><tbody>${cRows}</tbody></table>`:""}${orders.length?`<h2>Orders</h2><table><thead><tr><th>Order ID</th><th>Date</th><th>Cashier</th><th>Payment</th><th class="right">Total</th></tr></thead><tbody>${oRows}</tbody></table>`:""}`,`Sales Report — ${store?.store_name}`);
   };
   const doPrintShifts=()=>{
     const rows=shifts.map(s=>`<tr><td>${s.cashier}</td><td style="font-size:10px">${s.startTime}<br/>${s.endTime}</td><td class="right">${s.shiftOrders}</td><td class="right">${fmt(s.openCash)}</td><td class="right">${fmt(s.totalSales)}</td><td class="right">${fmt(s.totalExpenses||0)}</td><td class="right">${fmt(s.closeCash)}</td><td class="right ${s.overShort>=0?"green":"red"}">${s.overShort>=0?"+":""}${fmt(s.overShort)}</td></tr>`).join("");
     printReport(`<h1>Shift Report</h1><p class="meta">Store: ${store?.store_name} | ${shifts.length} shifts</p><table><thead><tr><th>Cashier</th><th>Period</th><th class="right">Orders</th><th class="right">Opening</th><th class="right">Sales</th><th class="right">Expenses</th><th class="right">Closing</th><th class="right">Over/Short</th></tr></thead><tbody>${rows}</tbody></table>`,`Shift Report — ${store?.store_name}`);
   };
   const doPrintBIR=()=>{
-    printReport(`<h1>BIR Tax Reference — ${birMonth}</h1><p class="meta">Store: ${store?.store_name} | For reference only — consult your licensed accountant</p><table><thead><tr><th>Category</th><th class="right">Amount</th></tr></thead><tbody><tr><td>Gross Sales</td><td class="right bold">${fmt(birGross)}</td></tr><tr><td>VATable Sales</td><td class="right">${fmt(birVatable)}</td></tr><tr><td class="bold">Output VAT (12%)</td><td class="right bold green">${fmt(birVat)}</td></tr><tr><td>VAT-Exempt Sales</td><td class="right">${fmt(birExempt)}</td></tr><tr><td>Zero-Rated Sales</td><td class="right">₱0.00</td></tr><tr><td>Total Orders</td><td class="right">${birOrders.length}</td></tr></tbody></table><div style="margin-top:16px;padding:12px;background:#fef3c7;border-radius:8px;font-size:11px;color:#92400e">⚠️ For reference only. Consult your licensed accountant for official BIR Form 2550M/2550Q filings.</div>`,`BIR Tax Reference — ${store?.store_name}`);
+    printReport(`<h1>BIR Tax Reference — ${birMonth}</h1><p class="meta">Store: ${store?.store_name} | For reference only</p><table><thead><tr><th>Category</th><th class="right">Amount</th></tr></thead><tbody><tr><td>Gross Sales</td><td class="right bold">${fmt(birGross)}</td></tr><tr><td>VATable Sales</td><td class="right">${fmt(birVatable)}</td></tr><tr><td><b>Output VAT (12%)</b></td><td class="right bold" style="color:#4f46e5">${fmt(birVat)}</td></tr><tr><td>VAT-Exempt Sales</td><td class="right">${fmt(birExempt)}</td></tr><tr><td>Zero-Rated</td><td class="right">₱0.00</td></tr><tr><td>Total Orders</td><td class="right">${birOrders.length}</td></tr></tbody></table><div style="margin-top:14px;padding:10px 14px;background:#fef3c7;border-radius:8px;font-size:11px;color:#92400e">⚠️ For reference only. Consult your licensed accountant for official BIR filings.</div>`,`BIR Tax — ${store?.store_name}`);
   };
   return(
     <div>
@@ -465,7 +459,7 @@ function Reports({store,data,primary}){
             <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
               {PERIODS.map(p=><button key={p.k} onClick={()=>setPeriod(p.k)} style={{padding:"4px 9px",borderRadius:6,border:"1px solid",cursor:"pointer",fontSize:11,fontWeight:700,borderColor:period===p.k?primary:"#e5e7eb",background:period===p.k?primary:"#fff",color:period===p.k?"#fff":"#6b7280"}}>{p.l}</button>)}
             </div>
-            <select value={payFilter} onChange={e=>setPayFilter(e.target.value)} style={{padding:"4px 8px",border:"1px solid #e5e7eb",borderRadius:6,fontSize:11,fontWeight:700,cursor:"pointer",background:"#f9fafb"}}>
+            <select value={payFilter} onChange={e=>setPayFilter(e.target.value)} style={{padding:"4px 8px",border:"1px solid #e5e7eb",borderRadius:6,fontSize:11,background:"#f9fafb",cursor:"pointer"}}>
               <option value="all">All Payments</option>
               <option value="cash">Cash</option>
               <option value="gcash">GCash</option>
@@ -473,6 +467,7 @@ function Reports({store,data,primary}){
               <option value="card">Card</option>
             </select>
           </>)}
+          {tab==="bir"&&<input type="month" value={birMonth} onChange={e=>setBirMonth(e.target.value)} style={{...INP,width:"auto",padding:"4px 8px",fontSize:12}}/>}
           <button onClick={tab==="sales"?doPrintSales:tab==="shifts"?doPrintShifts:doPrintBIR} style={{padding:"5px 12px",background:"#374151",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:5}}><i className="ti ti-printer" style={{fontSize:14}}/>Print</button>
         </div>
       </div>
@@ -535,31 +530,18 @@ function Reports({store,data,primary}){
           </Card>
         ))}
       </div>}
-
-      {/* BIR TAX TAB */}
       {tab==="bir"&&(
         <div>
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,flexWrap:"wrap"}}>
-            <div style={{fontWeight:800,fontSize:15}}>BIR Tax Reference</div>
-            <input type="month" value={birMonth} onChange={e=>setBirMonth(e.target.value)} style={{...INP,width:"auto",padding:"6px 10px"}}/>
-          </div>
-          <div style={{background:"#fff",border:"0.5px solid rgba(0,0,0,0.07)",borderRadius:12,overflow:"hidden",marginBottom:12}}>
-            {[
-              {label:"Gross Sales",     value:fmt(birGross),   bold:false},
-              {label:"VATable Sales",   value:fmt(birVatable), bold:false},
-              {label:"Output VAT (12%)",value:fmt(birVat),     bold:true,  color:"#4f46e5"},
-              {label:"VAT-Exempt Sales",value:fmt(birExempt),  bold:false},
-              {label:"Zero-Rated Sales",value:fmt(0),          bold:false, muted:true},
-              {label:"Total Orders",    value:birOrders.length,bold:false},
-            ].map((r,i)=>(
-              <div key={r.label} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"13px 18px",background:r.bold?"#f5f3ff":"#fff",borderBottom:i<5?"1px solid #f3f4f6":"none"}}>
-                <span style={{fontSize:13,color:r.muted?"#9ca3af":"#6b7280"}}>{r.label}</span>
-                <span style={{fontSize:r.bold?18:15,fontWeight:r.bold?800:700,color:r.color||r.muted?"#d1d5db":"#111"}}>{r.value}</span>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:14}}>
+            {[{l:"Gross Sales",v:fmt(birGross)},{l:"Output VAT (12%)",v:fmt(birVat),bold:true},{l:"VATable Sales",v:fmt(birVatable)},{l:"VAT-Exempt",v:fmt(birExempt)},{l:"Total Orders",v:birOrders.length}].map(r=>(
+              <div key={r.l} style={{background:"#fff",borderRadius:10,padding:14,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+                <div style={{fontSize:10,color:"#9ca3af",marginBottom:4}}>{r.l}</div>
+                <div style={{fontSize:r.bold?20:16,fontWeight:800,color:r.bold?primary:"#111"}}>{r.v}</div>
               </div>
             ))}
           </div>
           <div style={{background:"#fef3c7",border:"1px solid #fde68a",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#92400e"}}>
-            ⚠️ <b>For reference only.</b> This does not constitute official BIR documentation. Consult your licensed accountant for BIR Form 2550M/2550Q filings.
+            ⚠️ <b>For reference only.</b> Consult your licensed accountant for official BIR Form 2550M/2550Q filings.
           </div>
         </div>
       )}
@@ -614,13 +596,6 @@ function Inventory({store,data,session,saveField,primary}){
         <div style={{display:"flex",gap:8}}>
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search products…" style={{...INP,width:200,padding:"7px 12px"}}/>
           <button onClick={openAdd} style={{padding:"7px 14px",background:primary||"#4f46e5",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}}><i className="ti ti-plus"/>Add Product</button>
-          <button onClick={()=>{
-            const headers=["name","category","price","stock","sku","active"];
-            const rows=products.map(p=>[`"${(p.name||"").replace(/"/g,'""')}"`,`"${(p.category||"").replace(/"/g,'""')}"`,p.price||0,p.stock||0,`"${(p.sku||"").replace(/"/g,'""')}"`,p.active===false?"false":"true"].join(","));
-            const csv=[headers.join(","),...rows].join("\n");
-            const blob=new Blob([csv],{type:"text/csv"});
-            const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`inventory-${new Date().toISOString().slice(0,10)}.csv`;a.click();
-          }} style={{padding:"7px 10px",border:"1px solid #e5e7eb",borderRadius:8,cursor:"pointer",fontSize:13,background:"#f9fafb",display:"flex",alignItems:"center",gap:4}}><i className="ti ti-download"/> Export</button>
         </div>
       </div>
       {/* Category filters */}
@@ -694,7 +669,7 @@ function Orders({store,data,session,saveField}){
   const orders=data?.orders||[];
   const filtered=orders.filter(o=>(filter==="all"||o.status===filter)&&(o.id?.toLowerCase().includes(search.toLowerCase())||o.cashier?.toLowerCase().includes(search.toLowerCase())));
 
-  // Orders are READ-ONLY in portal — void is POS-only
+  // Orders are read-only in portal
 
   return(
     <div>
@@ -733,7 +708,7 @@ function Orders({store,data,session,saveField}){
             <div style={{display:"flex",justifyContent:"space-between",fontWeight:800,fontSize:16,margin:"10px 0 12px",paddingTop:8,borderTop:"1px dashed #e5e7eb"}}><span>Total</span><span style={{color:"#4f46e5"}}>{fmt(detail.total)}</span></div>
             <div style={{display:"flex",gap:8}}>
               <button onClick={()=>setDetail(null)} style={{flex:1,padding:"9px 0",border:"1px solid #e5e7eb",background:"#fff",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700}}>Close</button>
-
+              
             </div>
           </div>
         </div>
@@ -766,16 +741,6 @@ function Accounts({store,data,session,saveField}){
       updated=accounts.map(a=>a.id===form.id?form:a);
     }
     const ok=await saveField("accounts",updated);
-
-    // If editing the owner account and password changed, also sync to stores.owner_password
-    // so portal login stays in sync
-    if(ok && modal==="edit" && form.roleId==="role_owner"){
-      const original=accounts.find(a=>a.id===form.id);
-      if(original?.password!==form.password){
-        await supa.update("stores",{id:session.storeId},{owner_password:form.password});
-      }
-    }
-
     setSaving(false);setMsg(ok?"Saved!":"Failed to save.");
     if(ok)setTimeout(()=>{setModal(null);setMsg("");},700);
   };
