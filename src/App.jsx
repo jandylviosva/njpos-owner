@@ -290,7 +290,7 @@ function LoginScreen({onLogin}){
         <div style={{background:"#fff",borderRadius:20,padding:"28px 28px 24px",boxShadow:"0 24px 60px rgba(0,0,0,0.4)"}}>
           {screen==="email"&&(<>
             <div style={{fontWeight:800,fontSize:17,marginBottom:4}}>Sign In</div>
-            <div style={{fontSize:13,color:"#9ca3af",marginBottom:20}}>Enter your owner email — we\'ll send a sign-in code</div>
+            <div style={{fontSize:13,color:"#9ca3af",marginBottom:20}}>Enter your owner email — we'll send a sign-in code</div>
             <FRow label="Owner Email"><input type="email" value={email} onChange={e=>{setEmail(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&sendOTP()} placeholder="owner@email.com" style={INP} autoFocus/></FRow>
             <Err msg={error}/>
             {info&&<div style={{marginTop:8,padding:"8px 12px",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:8,fontSize:12,color:"#166534"}}>{info}</div>}
