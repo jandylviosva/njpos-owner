@@ -3,6 +3,9 @@
 
 const ALLOWED_ORIGINS = [
   "https://pospro-portal.vercel.app",
+  "https://pospro-portal-izm3duem8-jandyls-projects.vercel.app",
+  "https://www.pospro-portal.com",
+  "https://pospro-portal.com",
   "https://pospro-pwa.vercel.app",
   // Add any custom domains here if you have them
 ];
