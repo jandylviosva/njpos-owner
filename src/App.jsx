@@ -18,28 +18,6 @@ const supa = {
   async insert(table,data){
     try{const r=await fetch(`${SUPA_URL}/rest/v1/${table}`,{method:"POST",headers:{...H,"Prefer":"return=representation"},body:JSON.stringify(data)});const d=await r.json();return d[0]||null;}catch{return null;}
   },
-  async uploadImage(storeId, productId, base64DataUrl) {
-    try {
-      const res  = await fetch(base64DataUrl);
-      const blob = await res.blob();
-      const path = `${storeId}/${productId}.jpg`;
-      const r = await fetch(
-        `${SUPA_URL}/storage/v1/object/product-images/${path}`,
-        {
-          method:  "PUT",
-          headers: {
-            "apikey":        SUPA_ANON,
-            "Authorization": `Bearer ${SUPA_ANON}`,
-            "Content-Type":  "image/jpeg",
-            "x-upsert":      "true",
-          },
-          body: blob,
-        }
-      );
-      if (!r.ok) return null;
-      return `${SUPA_URL}/storage/v1/object/public/product-images/${path}`;
-    } catch { return null; }
-  },
 };
 
 // ── IMAGE COMPRESSION ──
@@ -687,15 +665,7 @@ function Inventory({store,data,session,saveField,primary}){
     else setMsg("Failed to delete.");
   };
 
-  const handleImg=async(e)=>{
-    const f=e.target.files[0];if(!f)return;
-    const compressed=await compressImage(f);
-    const session=getSession();
-    const storeId=session?.storeId||"";
-    const productId=form.id||("p"+Math.random().toString(36).slice(2,10));
-    const url=storeId?await supa.uploadImage(storeId,productId,compressed):null;
-    setForm(x=>({...x,image:url||compressed}));
-  };
+  const handleImg=async(e)=>{const f=e.target.files[0];if(!f)return;const compressed=await compressImage(f);setForm(x=>({...x,image:compressed}));};
 
   // ── CSV EXPORT ──
   const exportCSV=()=>{
