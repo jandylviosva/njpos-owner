@@ -20,6 +20,28 @@ const supa = {
   },
 };
 
+// ── IMAGE COMPRESSION ──
+const compressImage = (file, maxSize=300, quality=0.7) => new Promise((resolve) => {
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      let w = img.width, h = img.height;
+      if(w > maxSize || h > maxSize) {
+        if(w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+        else       { w = Math.round(w * maxSize / h); h = maxSize; }
+      }
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
 const fmt        = (n) => `₱${Number(n||0).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 const todayKey   = () => new Date().toISOString().slice(0,10);
 const weekStart  = () => { const d=new Date(); d.setDate(d.getDate()-d.getDay()); return d.toISOString().slice(0,10); };
@@ -604,7 +626,7 @@ function Inventory({store,data,session,saveField,primary}){
     else setMsg("Failed to delete.");
   };
 
-  const handleImg=(e)=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>setForm(x=>({...x,image:ev.target.result}));r.readAsDataURL(f);};
+  const handleImg=async(e)=>{const f=e.target.files[0];if(!f)return;const compressed=await compressImage(f);setForm(x=>({...x,image:compressed}));};
 
   // ── CSV EXPORT ──
   const exportCSV=()=>{
