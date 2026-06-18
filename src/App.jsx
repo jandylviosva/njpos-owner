@@ -637,7 +637,7 @@ function Inventory({store,data,session,saveField,primary}){
     return `${(skuSettings.prefix||"SW").toUpperCase()}${String(counter).padStart(5,"0")}${(skuSettings.suffix||"").toUpperCase()}`;
   };
 
-  const openAdd=()=>{setForm({id:"p"+uid(),name:"",price:"",category:categories[0]||"Food",stock:0,sku:genNextSKU(),active:true,image:"",showInPOS:true,recipe:[]});setModal("add");setMsg("");};
+  const openAdd=()=>{setForm({id:"p"+uid(),name:"",price:"",category:categories[0]||"Food",stock:0,sku:genNextSKU(),active:true,image:"",showInPOS:true,recipe:[],stockMode:"manual"});setModal("add");setMsg("");};
   const openEdit=(p)=>{setForm({...p,price:String(p.price),stock:String(p.stock)});setModal("edit");setMsg("");};
 
   const save=async()=>{
@@ -763,6 +763,7 @@ function Inventory({store,data,session,saveField,primary}){
                       <span style={{fontWeight:600}}>{p.name}</span>
                       <div style={{display:"flex",gap:4,marginTop:3,flexWrap:"wrap"}}>
                         {p.recipe?.length>0&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#e0f2fe",color:"#0891b2"}}>{p.recipe.length} ingredients</span>}
+                        {p.recipe?.length>0&&p.stockMode==="auto"&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#f0fdf4",color:"#16a34a"}}>⚙ auto stock</span>}
                         {p.showInPOS===false&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#fef3c7",color:"#92400e"}}>Hidden from POS</span>}
                       </div>
                     </div>
@@ -770,7 +771,16 @@ function Inventory({store,data,session,saveField,primary}){
                 </td>
                 <td style={{padding:"10px 12px",color:"#6b7280"}}>{p.category}</td>
                 <td style={{padding:"10px 12px",fontWeight:700,color:primary||"#4f46e5"}}>{fmt(p.price)}</td>
-                <td style={{padding:"10px 12px"}}><span style={{fontWeight:700,color:p.stock===0?"#dc2626":p.stock<10?"#f59e0b":"#111"}}>{p.stock}</span></td>
+                <td style={{padding:"10px 12px"}}>{(()=>{
+                  // Compute auto stock from recipe for portal display
+                  let s=p.stock;
+                  if(p.stockMode==="auto"&&p.recipe?.length){
+                    let min=Infinity;
+                    p.recipe.forEach(r=>{if(!r.productId||!r.qty)return;const ing=products.find(x=>x.id===r.productId);if(!ing)return;min=Math.min(min,Math.floor(ing.stock/r.qty));});
+                    s=min===Infinity?0:Math.max(0,min);
+                  }
+                  return(<div style={{display:"flex",alignItems:"center",gap:4}}><span style={{fontWeight:700,color:s===0?"#dc2626":s<10?"#f59e0b":"#111"}}>{s}</span>{p.stockMode==="auto"&&<span style={{fontSize:8,fontWeight:700,padding:"1px 4px",borderRadius:4,background:"#e0f2fe",color:"#0891b2"}}>AUTO</span>}</div>);
+                })()}</td>
                 <td style={{padding:"10px 12px",fontFamily:"monospace",fontSize:11,color:"#6b7280"}}>{p.sku||"—"}</td>
                 <td style={{padding:"10px 12px"}}>
                   <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10,background:p.active?"#f0fdf4":"#fef2f2",color:p.active?"#166534":"#991b1b"}}>{p.active?"Active":"Hidden"}</span>
@@ -864,7 +874,20 @@ function Inventory({store,data,session,saveField,primary}){
                 </FRow>
                 <FRow label="Price (₱)"><input type="number" value={form.price} onChange={e=>setForm(f=>({...f,price:e.target.value}))} style={INP}/></FRow>
               </div>
-              <FRow label="Stock"><input type="number" value={form.stock} onChange={e=>setForm(f=>({...f,stock:e.target.value}))} style={INP}/></FRow>
+              {(form.stockMode||"manual")!=="auto"&&<FRow label="Stock"><input type="number" value={form.stock} onChange={e=>setForm(f=>({...f,stock:e.target.value}))} style={INP}/></FRow>}
+              {(form.stockMode||"manual")==="auto"&&form.recipe?.length>0&&<div style={{padding:"8px 12px",background:"#e0f2fe",borderRadius:8,fontSize:12,color:"#0891b2",fontWeight:600}}>⚙ Stock auto-computed from recipe ingredients</div>}
+              {form.recipe?.length>0&&(
+                <FRow label="Stock Mode">
+                  <div style={{display:"flex",gap:8,marginTop:4}}>
+                    {["manual","auto"].map(m=>(
+                      <button key={m} onClick={()=>setForm(f=>({...f,stockMode:m}))} style={{flex:1,padding:"7px 0",borderRadius:8,border:`1.5px solid ${(form.stockMode||"manual")===m?"#4f46e5":"#e5e7eb"}`,background:(form.stockMode||"manual")===m?"#4f46e5":"#fff",color:(form.stockMode||"manual")===m?"#fff":"#6b7280",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                        {m==="auto"?"⚙ Auto (from recipe)":"Manual"}
+                      </button>
+                    ))}
+                  </div>
+                  {(form.stockMode||"manual")==="auto"&&<div style={{fontSize:11,color:"#0891b2",marginTop:5}}>Stock = minimum servings possible from ingredient stocks</div>}
+                </FRow>
+              )}
               <FRow label="SKU"><input value={form.sku} onChange={e=>setForm(f=>({...f,sku:e.target.value.toUpperCase()}))} style={{...INP,fontFamily:"monospace"}}/></FRow>
               <FRow label="Status">
                 <select value={form.active?"active":"hidden"} onChange={e=>setForm(f=>({...f,active:e.target.value==="active"}))} style={INP}>
@@ -1212,6 +1235,12 @@ function Settings({store,data,session,saveField,onRefresh,setStore}){
             <SectionTitle>VAT / Tax</SectionTitle>
             <div style={{marginBottom:12}}><Toggle checked={osForm.vatEnabled} onChange={v=>setOsForm(f=>({...f,vatEnabled:v}))} label="Enable VAT by default on new orders"/></div>
             <FRow label="VAT Percentage (%)"><input type="number" value={osForm.vatPercent} onChange={e=>setOsForm(f=>({...f,vatPercent:parseFloat(e.target.value)||0}))} min={0} max={100} style={{...INP,maxWidth:120}}/></FRow>
+          </Card>
+          <Card>
+            <SectionTitle>Open Bills</SectionTitle>
+            <div style={{fontSize:12,color:"#9ca3af",marginBottom:12}}>Allow cashiers to save an order and let customers pay later or add more items. Common in eateries and restaurants.</div>
+            <Toggle checked={osForm.enableOpenBills||false} onChange={v=>setOsForm(f=>({...f,enableOpenBills:v}))} label="Enable Open Bills (Pay Later)"/>
+            {osForm.enableOpenBills&&<div style={{marginTop:10,padding:"8px 12px",background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:8,fontSize:12,color:"#c2410c"}}>When enabled, cashiers will see a \"Save as Open Bill\" button in the payment screen of the POS App.</div>}
           </Card>
           <Card>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
