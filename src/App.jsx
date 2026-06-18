@@ -18,34 +18,6 @@ const supa = {
   async insert(table,data){
     try{const r=await fetch(`${SUPA_URL}/rest/v1/${table}`,{method:"POST",headers:{...H,"Prefer":"return=representation"},body:JSON.stringify(data)});const d=await r.json();return d[0]||null;}catch{return null;}
   },
-  async uploadImage(storeId, productId, base64DataUrl) {
-    try {
-      const res  = await fetch(base64DataUrl);
-      const blob = await res.blob();
-      const mime = blob.type || "image/jpeg";
-      const ext  = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
-      const path = `${storeId}/${productId}.${ext}`;
-      const r = await fetch(
-        `${SUPA_URL}/storage/v1/object/product-images/${path}`,
-        {
-          method:  "PUT",
-          headers: {
-            "apikey":        SUPA_ANON,
-            "Authorization": `Bearer ${SUPA_ANON}`,
-            "Content-Type":  mime,
-            "x-upsert":      "true",
-          },
-          body: blob,
-        }
-      );
-      if (!r.ok) {
-        const err = await r.text().catch(()=>"");
-        console.error("[Storage] Upload failed", r.status, err);
-        return null;
-      }
-      return `${SUPA_URL}/storage/v1/object/public/product-images/${path}`;
-    } catch(e) { console.error("[Storage] Upload error", e); return null; }
-  },
 };
 
 // ── IMAGE COMPRESSION ──
@@ -665,7 +637,7 @@ function Inventory({store,data,session,saveField,primary}){
     return `${(skuSettings.prefix||"SW").toUpperCase()}${String(counter).padStart(5,"0")}${(skuSettings.suffix||"").toUpperCase()}`;
   };
 
-  const openAdd=()=>{setForm({id:"p"+uid(),name:"",price:"",category:categories[0]||"Food",stock:0,sku:genNextSKU(),active:true,image:""});setModal("add");setMsg("");};
+  const openAdd=()=>{setForm({id:"p"+uid(),name:"",price:"",category:categories[0]||"Food",stock:0,sku:genNextSKU(),active:true,image:"",showInPOS:true,recipe:[]});setModal("add");setMsg("");};
   const openEdit=(p)=>{setForm({...p,price:String(p.price),stock:String(p.stock)});setModal("edit");setMsg("");};
 
   const save=async()=>{
@@ -693,15 +665,7 @@ function Inventory({store,data,session,saveField,primary}){
     else setMsg("Failed to delete.");
   };
 
-  const handleImg=async(e)=>{
-    const f=e.target.files[0];if(!f)return;
-    const compressed=await compressImage(f);
-    const sess=getSession();
-    const storeId=sess?.storeId||"";
-    const productId=form.id||("p"+Math.random().toString(36).slice(2,10));
-    const url=storeId?await supa.uploadImage(storeId,productId,compressed):null;
-    setForm(x=>({...x,image:url||compressed}));
-  };
+  const handleImg=async(e)=>{const f=e.target.files[0];if(!f)return;const compressed=await compressImage(f);setForm(x=>({...x,image:compressed}));};
 
   // ── CSV EXPORT ──
   const exportCSV=()=>{
@@ -795,7 +759,13 @@ function Inventory({store,data,session,saveField,primary}){
                     <div style={{width:36,height:36,borderRadius:8,overflow:"hidden",background:"#f3f4f6",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                       {p.image?<img src={p.image} alt={p.name} style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<i className="ti ti-photo" style={{fontSize:16,color:"#d1d5db"}}/>}
                     </div>
-                    <span style={{fontWeight:600}}>{p.name}</span>
+                    <div>
+                      <span style={{fontWeight:600}}>{p.name}</span>
+                      <div style={{display:"flex",gap:4,marginTop:3,flexWrap:"wrap"}}>
+                        {p.recipe?.length>0&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#e0f2fe",color:"#0891b2"}}>{p.recipe.length} ingredients</span>}
+                        {p.showInPOS===false&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#fef3c7",color:"#92400e"}}>Hidden from POS</span>}
+                      </div>
+                    </div>
                   </div>
                 </td>
                 <td style={{padding:"10px 12px",color:"#6b7280"}}>{p.category}</td>
@@ -901,6 +871,29 @@ function Inventory({store,data,session,saveField,primary}){
                   <option value="active">Active</option>
                   <option value="hidden">Hidden</option>
                 </select>
+              </FRow>
+              <FRow label="Show in POS">
+                <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",marginTop:4}}>
+                  <div onClick={()=>setForm(f=>({...f,showInPOS:!(f.showInPOS!==false)}))} style={{width:40,height:22,borderRadius:11,background:form.showInPOS!==false?"#4f46e5":"#d1d5db",position:"relative",transition:"background 0.2s",flexShrink:0,cursor:"pointer"}}>
+                    <div style={{width:18,height:18,borderRadius:"50%",background:"#fff",position:"absolute",top:2,left:form.showInPOS!==false?20:2,transition:"left 0.2s",boxShadow:"0 1px 3px rgba(0,0,0,0.2)"}}/>
+                  </div>
+                  <span style={{fontSize:12,color:"#6b7280"}}>{form.showInPOS!==false?"Visible in POS cashier grid":"Hidden from POS cashier grid (ingredients, internal items)"}</span>
+                </label>
+              </FRow>
+              <FRow label="Recipe / Ingredients" hint="optional — deducts ingredient stock on sale">
+                <div style={{marginTop:4}}>
+                  {(form.recipe||[]).map((r,i)=>(
+                    <div key={i} style={{display:"flex",gap:6,alignItems:"center",marginBottom:6}}>
+                      <select value={r.productId||""} onChange={e=>{const rec=[...(form.recipe||[])];rec[i]={...rec[i],productId:e.target.value};setForm(f=>({...f,recipe:rec}));}} style={{...INP,flex:2,padding:"6px 8px"}}>
+                        <option value="">— Select ingredient —</option>
+                        {products.filter(p=>p.id!==form.id).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                      <input type="number" min={0.01} step={0.01} value={r.qty||""} onChange={e=>{const rec=[...(form.recipe||[])];rec[i]={...rec[i],qty:parseFloat(e.target.value)||0};setForm(f=>({...f,recipe:rec}));}} placeholder="Qty" style={{...INP,width:70,padding:"6px 8px",textAlign:"center"}}/>
+                      <button onClick={()=>{const rec=(form.recipe||[]).filter((_,j)=>j!==i);setForm(f=>({...f,recipe:rec}));}} style={{padding:"5px 8px",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:6,cursor:"pointer",color:"#dc2626",flexShrink:0}}>✕</button>
+                    </div>
+                  ))}
+                  <button onClick={()=>setForm(f=>({...f,recipe:[...(f.recipe||[]),{productId:"",qty:1}]}))} style={{padding:"5px 12px",border:"1.5px dashed #d1d5db",borderRadius:7,cursor:"pointer",fontSize:11,color:"#6b7280",background:"#f9fafb",width:"100%"}}>+ Add Ingredient</button>
+                </div>
               </FRow>
               {msg&&<div style={{fontSize:12,color:msg==="Saved!"?"#166534":"#dc2626",fontWeight:700}}>{msg}</div>}
               <div style={{display:"flex",gap:8,marginTop:4}}>
