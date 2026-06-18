@@ -764,6 +764,7 @@ function Inventory({store,data,session,saveField,primary}){
                       <div style={{display:"flex",gap:4,marginTop:3,flexWrap:"wrap"}}>
                         {p.recipe?.length>0&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#e0f2fe",color:"#0891b2"}}>{p.recipe.length} ingredients</span>}
                         {p.recipe?.length>0&&p.stockMode==="auto"&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#f0fdf4",color:"#16a34a"}}>⚙ auto stock</span>}
+                        {p.recipe?.length>0&&p.recipe.some(r=>{const ing=products.find(x=>x.id===r.productId);return !ing||!ing.active;})&&<span title="Some ingredients are hidden or deleted" style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#fef2f2",color:"#dc2626"}}>⚠ recipe issue</span>}
                         {p.showInPOS===false&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#fef3c7",color:"#92400e"}}>Hidden from POS</span>}
                       </div>
                     </div>
@@ -909,7 +910,7 @@ function Inventory({store,data,session,saveField,primary}){
                     <div key={i} style={{display:"flex",gap:6,alignItems:"center",marginBottom:6}}>
                       <select value={r.productId||""} onChange={e=>{const rec=[...(form.recipe||[])];rec[i]={...rec[i],productId:e.target.value};setForm(f=>({...f,recipe:rec}));}} style={{...INP,flex:2,padding:"6px 8px"}}>
                         <option value="">— Select ingredient —</option>
-                        {products.filter(p=>p.id!==form.id).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+                        {products.filter(p=>p.active&&p.id!==form.id).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
                       </select>
                       <input type="number" min={0.01} step={0.01} value={r.qty||""} onChange={e=>{const rec=[...(form.recipe||[])];rec[i]={...rec[i],qty:parseFloat(e.target.value)||0};setForm(f=>({...f,recipe:rec}));}} placeholder="Qty" style={{...INP,width:70,padding:"6px 8px",textAlign:"center"}}/>
                       <button onClick={()=>{const rec=(form.recipe||[]).filter((_,j)=>j!==i);setForm(f=>({...f,recipe:rec}));}} style={{padding:"5px 8px",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:6,cursor:"pointer",color:"#dc2626",flexShrink:0}}>✕</button>
