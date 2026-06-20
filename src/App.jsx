@@ -874,7 +874,7 @@ function Inventory({store,data,session,saveField,primary}){
                 })()}</td>
                 <td style={{padding:"10px 12px",fontFamily:"monospace",fontSize:11,color:"#6b7280"}}>{p.sku||"—"}</td>
                 <td style={{padding:"10px 12px"}}>
-                  <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10,background:p.active?"#f0fdf4":"#fef2f2",color:p.active?"#166534":"#991b1b"}}>{p.active?"Active":"Hidden"}</span>
+                  <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10,background:p.active?"#f0fdf4":"#fef2f2",color:p.active?"#166534":"#991b1b"}}>{p.active?"Active":"Inactive"}</span>
                 </td>
                 <td style={{padding:"10px 12px"}}>
                   <div style={{display:"flex",gap:5}}>
@@ -983,7 +983,7 @@ function Inventory({store,data,session,saveField,primary}){
               <FRow label="Status">
                 <select value={form.active?"active":"hidden"} onChange={e=>setForm(f=>({...f,active:e.target.value==="active"}))} style={INP}>
                   <option value="active">Active</option>
-                  <option value="hidden">Hidden</option>
+                  <option value="hidden">Inactive</option>
                 </select>
               </FRow>
               <FRow label="Show in POS">
