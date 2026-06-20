@@ -144,6 +144,79 @@ function Err({msg}){if(!msg)return null;return<div style={{marginTop:10,padding:
 function Ok({msg}){if(!msg)return null;return<div style={{marginTop:10,padding:"9px 12px",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:8,fontSize:13,color:"#166534",display:"flex",alignItems:"center",gap:7}}><i className="ti ti-check" style={{fontSize:15,flexShrink:0}}/>{msg}</div>;}
 function Toggle({checked,onChange,label}){return<label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}}><div onClick={()=>onChange(!checked)} style={{width:40,height:22,borderRadius:11,background:checked?"#4f46e5":"#d1d5db",position:"relative",transition:"background 0.2s",flexShrink:0,cursor:"pointer"}}><div style={{width:18,height:18,borderRadius:"50%",background:"#fff",position:"absolute",top:2,left:checked?20:2,transition:"left 0.2s",boxShadow:"0 1px 3px rgba(0,0,0,0.2)"}}/></div>{label&&<span style={{fontSize:13,fontWeight:600,color:"#374151"}}>{label}</span>}</label>;}
 
+// ════════════════════════════════════════════════════════
+// PRODUCT SEARCH SELECT — type-to-filter dropdown for inclusions.
+// Only shows active products. onSelect receives the full product object.
+// ════════════════════════════════════════════════════════
+function ProductSearchSelect({products, value, onSelect, placeholder, excludeId}){
+  const [open,setOpen] = useState(false);
+  const [query,setQuery] = useState(value||"");
+  const [coords,setCoords] = useState(null);
+  const wrapRef = useRef(null);
+  const inputRef = useRef(null);
+
+  useEffect(()=>{ setQuery(value||""); },[value]);
+
+  useEffect(()=>{
+    const onClickOutside = (e) => {
+      if(wrapRef.current && !wrapRef.current.contains(e.target) &&
+         !(e.target.closest && e.target.closest("[data-pss-panel]"))) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return ()=>document.removeEventListener("mousedown", onClickOutside);
+  },[]);
+
+  useEffect(()=>{
+    if(!open) return;
+    const updatePos = () => {
+      const r = inputRef.current?.getBoundingClientRect();
+      if(r) setCoords({top:r.bottom+2, left:r.left, width:r.width});
+    };
+    updatePos();
+    window.addEventListener("scroll", updatePos, true);
+    window.addEventListener("resize", updatePos);
+    return ()=>{
+      window.removeEventListener("scroll", updatePos, true);
+      window.removeEventListener("resize", updatePos);
+    };
+  },[open]);
+
+  const active = (products||[]).filter(p=>p.active && p.id!==excludeId);
+  const filtered = query.trim()
+    ? active.filter(p=>p.name.toLowerCase().includes(query.trim().toLowerCase()))
+    : active;
+
+  return (
+    <div ref={wrapRef} style={{position:"relative"}}>
+      <input
+        ref={inputRef}
+        value={query}
+        onChange={e=>{ setQuery(e.target.value); setOpen(true); }}
+        onFocus={()=>setOpen(true)}
+        placeholder={placeholder||"Search product…"}
+        style={{...INP, padding:"5px 8px"}}
+      />
+      {open && filtered.length>0 && coords && (
+        <div data-pss-panel style={{position:"fixed", top:coords.top, left:coords.left, width:coords.width, zIndex:9999, background:"#fff", border:"1px solid #e5e7eb", borderRadius:8, maxHeight:220, overflowY:"auto", boxShadow:"0 4px 14px rgba(0,0,0,0.18)"}}>
+          {filtered.slice(0,50).map(p=>(
+            <div key={p.id}
+              onMouseDown={()=>{ setQuery(p.name); setOpen(false); onSelect(p); }}
+              style={{padding:"8px 10px", cursor:"pointer", fontSize:13, display:"flex", justifyContent:"space-between", alignItems:"center", borderBottom:"1px solid #f3f4f6"}}
+              onMouseEnter={e=>e.currentTarget.style.background="#f9fafb"}
+              onMouseLeave={e=>e.currentTarget.style.background="#fff"}
+            >
+              <span>{p.name}</span>
+              <span style={{fontSize:11, color:"#9ca3af"}}>{fmt(p.price)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function printReport(html,title){
   const win=window.open("","_blank","width=900,height=700");if(!win)return;
   win.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:12px;padding:20px;color:#111}h1{font-size:18px;font-weight:800;margin-bottom:4px}h2{font-size:13px;font-weight:700;margin:16px 0 8px;color:#4f46e5;border-bottom:2px solid #4f46e5;padding-bottom:4px}.meta{font-size:11px;color:#6b7280;margin-bottom:16px}table{width:100%;border-collapse:collapse;margin-bottom:16px}th{background:#f3f4f6;padding:6px 8px;text-align:left;font-weight:700;font-size:11px;color:#6b7280;text-transform:uppercase;border-bottom:2px solid #e5e7eb}td{padding:6px 8px;border-bottom:1px solid #f3f4f6}.right{text-align:right}.bold{font-weight:800}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}.card{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px}.card-label{font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px}.card-val{font-size:20px;font-weight:800;color:#4f46e5;margin-top:4px}.green{color:#166534}.red{color:#991b1b}@media print{button{display:none!important}}</style></head><body>${html}<div style="margin-top:24px;text-align:right"><button onclick="window.print()" style="padding:10px 22px;background:#4f46e5;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:800">Print</button><button onclick="window.close()" style="padding:10px 22px;background:#f3f4f6;color:#374151;border:none;border-radius:8px;cursor:pointer;font-size:14px;margin-left:8px">Close</button></div></body></html>`);
@@ -996,16 +1069,24 @@ function Inventory({store,data,session,saveField,primary}){
               </FRow>
               <FRow label="Inclusions" hint="optional — deducts stock on sale">
                 <div style={{marginTop:4}}>
-                  {(form.recipe||[]).map((r,i)=>(
+                  {(form.recipe||[]).map((r,i)=>{
+                    const selProd = r.productId ? products.find(p=>p.id===r.productId) : null;
+                    return(
                     <div key={i} style={{display:"flex",gap:6,alignItems:"center",marginBottom:6}}>
-                      <select value={r.productId||""} onChange={e=>{const rec=[...(form.recipe||[])];rec[i]={...rec[i],productId:e.target.value};setForm(f=>({...f,recipe:rec}));}} style={{...INP,flex:2,padding:"6px 8px"}}>
-                        <option value="">— Select inclusion —</option>
-                        {products.filter(p=>p.active&&p.id!==form.id).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
-                      </select>
+                      <div style={{flex:2}}>
+                        <ProductSearchSelect
+                          products={products}
+                          value={selProd?.name||""}
+                          excludeId={form.id}
+                          placeholder="Search inclusion…"
+                          onSelect={(p)=>{const rec=[...(form.recipe||[])];rec[i]={...rec[i],productId:p.id};setForm(f=>({...f,recipe:rec}));}}
+                        />
+                      </div>
                       <input type="number" min={0.01} step={0.01} value={r.qty||""} onChange={e=>{const rec=[...(form.recipe||[])];rec[i]={...rec[i],qty:parseFloat(e.target.value)||0};setForm(f=>({...f,recipe:rec}));}} placeholder="Qty" style={{...INP,width:70,padding:"6px 8px",textAlign:"center"}}/>
                       <button onClick={()=>{const rec=(form.recipe||[]).filter((_,j)=>j!==i);setForm(f=>({...f,recipe:rec}));}} style={{padding:"5px 8px",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:6,cursor:"pointer",color:"#dc2626",flexShrink:0}}>✕</button>
                     </div>
-                  ))}
+                    );
+                  })}
                   <button onClick={()=>setForm(f=>({...f,recipe:[...(f.recipe||[]),{productId:"",qty:1}]}))} style={{padding:"5px 12px",border:"1.5px dashed #d1d5db",borderRadius:7,cursor:"pointer",fontSize:11,color:"#6b7280",background:"#f9fafb",width:"100%"}}>+ Add Inclusion</button>
                 </div>
               </FRow>
