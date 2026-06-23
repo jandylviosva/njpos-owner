@@ -1170,15 +1170,23 @@ function Accounts({store,data,session,saveField}){
   const [showPw,setShowPw]=useState(false);
 
   const openAdd=()=>{setForm({id:"acc"+uid(),name:"",username:"",password:"",roleId:roles.find(r=>r.id==="role_staff")?.id||"role_staff",active:true,phone:"",email:"",address:"",notes:""});setModal("add");setMsg("");setShowPw(false);};
-  const openEdit=(a)=>{setForm({...a});setModal("edit");setMsg("");setShowPw(false);};
+  const openEdit=(a)=>{setForm({...a,password:""});setModal("edit");setMsg("");setShowPw(false);};
 
   const save=async()=>{
-    if(!form.name||!form.username||!form.password){setMsg("Name, username and password required");return;}
+    if(!form.name||!form.username||(modal==="add"&&!form.password)){setMsg("Name, username and password required");return;}
     setSaving(true);
     let finalForm = {...form};
-    // Hash if it's not already a bcrypt hash
-    if(!finalForm.password?.startsWith("$2")) {
-      finalForm.password = await bcrypt.hash(finalForm.password, 10);
+    if(modal==="edit"){
+      if(finalForm.password){
+        finalForm.password = await bcrypt.hash(finalForm.password, 10);
+      } else {
+        const existing = accounts.find(a=>a.id===finalForm.id);
+        finalForm.password = existing?.password || "";
+      }
+    } else {
+      if(!finalForm.password.startsWith("$2")){
+        finalForm.password = await bcrypt.hash(finalForm.password, 10);
+      }
     }
     let updated;
     if(modal==="add"){
