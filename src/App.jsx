@@ -1245,7 +1245,7 @@ function Accounts({store,data,session,saveField}){
               </div>
               <FRow label="Password">
                 <div style={{position:"relative"}}>
-                  <input type={showPw?"text":"password"} value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} style={{...INP,paddingRight:38}}/>
+                  <input type={showPw?"text":"password"} value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} placeholder={modal==="edit"?"Leave blank to keep current password":"Minimum 6 characters"} style={{...INP,paddingRight:38}}/>
                   <button type="button" onClick={()=>setShowPw(s=>!s)} style={{position:"absolute",right:9,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"#9ca3af",fontSize:17}}><i className={`ti ${showPw?"ti-eye-off":"ti-eye"}`}/></button>
                 </div>
               </FRow>
