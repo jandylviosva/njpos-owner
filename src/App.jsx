@@ -566,10 +566,34 @@ function Dashboard({store,data,primary}){
   ];
   return(
     <div>
-      {activeShift&&<div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:12,padding:"11px 16px",marginBottom:18,display:"flex",alignItems:"center",gap:10}}>
-        <div style={{width:10,height:10,borderRadius:"50%",background:"#16a34a",boxShadow:"0 0 8px #16a34a",flexShrink:0}}/>
-        <div style={{fontSize:13}}><b style={{color:"#166534"}}>Shift in progress</b> — {activeShift.cashier} · Started: {activeShift.startTime} · Opening cash: {fmt(activeShift.openCash)}</div>
-      </div>}
+      {activeShift&&(()=>{
+        const shiftOrders=orders.filter(o=>o.shiftId===activeShift.id);
+        const shiftSales=shiftOrders.reduce((s,o)=>s+o.total,0);
+        const cashSales=shiftOrders.filter(o=>o.payMethod==="cash").reduce((s,o)=>s+o.total,0);
+        return(
+          <div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:12,padding:"14px 18px",marginBottom:18}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+              <div style={{width:10,height:10,borderRadius:"50%",background:"#16a34a",boxShadow:"0 0 8px #16a34a",flexShrink:0,animation:"pulse 2s infinite"}}/>
+              <b style={{color:"#166534",fontSize:14}}>Shift In Progress</b>
+              <span style={{fontSize:12,color:"#6b7280",marginLeft:"auto"}}>{activeShift.startTime}</span>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10}}>
+              {[
+                {label:"Cashier",      value:activeShift.cashier,          color:"#166534"},
+                {label:"Opening Cash", value:fmt(activeShift.openCash),    color:"#374151"},
+                {label:"Shift Sales",  value:fmt(shiftSales),              color:primary||"#4f46e5"},
+                {label:"Orders",       value:`${shiftOrders.length} orders`,color:"#374151"},
+                {label:"Cash Sales",   value:fmt(cashSales),               color:"#374151"},
+              ].map(r=>(
+                <div key={r.label} style={{background:"#fff",borderRadius:8,padding:"8px 12px"}}>
+                  <div style={{fontSize:10,color:"#9ca3af",fontWeight:600,textTransform:"uppercase",letterSpacing:0.4,marginBottom:3}}>{r.label}</div>
+                  <div style={{fontSize:14,fontWeight:800,color:r.color}}>{r.value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:14,marginBottom:20}}>
         {CARDS.map(c=>(
           <div key={c.label} style={{background:"#fff",borderRadius:14,padding:18,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
