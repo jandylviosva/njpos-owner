@@ -630,6 +630,9 @@ function Reports({store,data,primary}){
   const [from,setFrom]=useState("");const [to,setTo]=useState("");
   const [payFilter,setPayFilter]=useState("all");
   const [birMonth,setBirMonth]=useState(new Date().toISOString().slice(0,7));
+  const [shiftPeriod,setShiftPeriod]=useState("all");
+  const [shiftFrom,setShiftFrom]=useState("");
+  const [shiftTo,setShiftTo]=useState("");
   const allOrders=(data?.orders||[]).filter(o=>o.status==="paid");
   const shifts=data?.shifts||[];
   const inPeriod=o=>{
@@ -665,8 +668,17 @@ function Reports({store,data,primary}){
     printReport(`<h1>Sales Report — ${periodLabel}${payFilter!=="all"?` · ${payFilter.toUpperCase()}`:""}</h1><p class="meta">Store: ${store?.store_name} | ${new Date().toLocaleString("en-PH")} | ${orders.length} orders</p><div class="summary"><div class="card"><div class="card-label">Total Sales</div><div class="card-val">${fmt(totalSales)}</div></div><div class="card"><div class="card-label">Orders</div><div class="card-val">${orders.length}</div></div><div class="card"><div class="card-label">Avg Order</div><div class="card-val">${fmt(avg)}</div></div></div>${payRows?`<h2>By Payment Method</h2><table><thead><tr><th>Method</th><th class="right">Total</th></tr></thead><tbody>${payRows}</tbody></table>`:""}${topProds.length?`<h2>Top Products</h2><table><thead><tr><th>Product</th><th class="right">Qty</th><th class="right">Revenue</th></tr></thead><tbody>${pRows}</tbody></table>`:""}${Object.keys(cashierS).length?`<h2>By Cashier</h2><table><thead><tr><th>Cashier</th><th class="right">Orders</th><th class="right">Revenue</th></tr></thead><tbody>${cRows}</tbody></table>`:""}${orders.length?`<h2>Orders</h2><table><thead><tr><th>Order ID</th><th>Date</th><th>Cashier</th><th>Payment</th><th class="right">Total</th></tr></thead><tbody>${oRows}</tbody></table>`:""}`,`Sales Report — ${store?.store_name}`);
   };
   const doPrintShifts=()=>{
-    const rows=shifts.map(s=>`<tr><td>${s.cashier}</td><td style="font-size:10px">${s.startTime}<br/>${s.endTime}</td><td class="right">${s.shiftOrders}</td><td class="right">${fmt(s.openCash)}</td><td class="right">${fmt(s.totalSales)}</td><td class="right">${fmt(s.totalExpenses||0)}</td><td class="right">${fmt(s.closeCash)}</td><td class="right ${s.overShort>=0?"green":"red"}">${s.overShort>=0?"+":""}${fmt(s.overShort)}</td></tr>`).join("");
-    printReport(`<h1>Shift Report</h1><p class="meta">Store: ${store?.store_name} | ${shifts.length} shifts</p><table><thead><tr><th>Cashier</th><th>Period</th><th class="right">Orders</th><th class="right">Opening</th><th class="right">Sales</th><th class="right">Expenses</th><th class="right">Closing</th><th class="right">Over/Short</th></tr></thead><tbody>${rows}</tbody></table>`,`Shift Report — ${store?.store_name}`);
+    const printShifts=shifts.filter(s=>{
+      const dk=s.startDateKey||(s.startTime?s.startTime.slice(0,10):"");
+      if(shiftPeriod==="today")  return dk===todayKey();
+      if(shiftPeriod==="week")   return dk>=weekStart();
+      if(shiftPeriod==="month")  return dk>=monthStart();
+      if(shiftPeriod==="custom") return(!shiftFrom||dk>=shiftFrom)&&(!shiftTo||dk<=shiftTo);
+      return true;
+    });
+    const shiftPeriodLabel=shiftPeriod==="today"?"Today":shiftPeriod==="week"?"This Week":shiftPeriod==="month"?"This Month":shiftPeriod==="custom"?(shiftFrom||"")+" → "+(shiftTo||""):"All Time";
+    const rows=printShifts.map(s=>`<tr><td>${s.cashier}</td><td style="font-size:10px">${s.startTime}<br/>${s.endTime}</td><td class="right">${s.shiftOrders}</td><td class="right">${fmt(s.openCash)}</td><td class="right">${fmt(s.totalSales)}</td><td class="right">${fmt(s.totalExpenses||0)}</td><td class="right">${fmt(s.closeCash)}</td><td class="right ${s.overShort>=0?"green":"red"}">${s.overShort>=0?"+":""}${fmt(s.overShort)}</td></tr>`).join("");
+    printReport(`<h1>Shift Report — ${shiftPeriodLabel}</h1><p class="meta">Store: ${store?.store_name} | ${printShifts.length} shifts</p><table><thead><tr><th>Cashier</th><th>Period</th><th class="right">Orders</th><th class="right">Opening</th><th class="right">Sales</th><th class="right">Expenses</th><th class="right">Closing</th><th class="right">Over/Short</th></tr></thead><tbody>${rows}</tbody></table>`,`Shift Report — ${store?.store_name}`);
   };
   const doPrintBIR=()=>{
     printReport(`<h1>BIR Tax Reference — ${birMonth}</h1><p class="meta">Store: ${store?.store_name} | For reference only</p><table><thead><tr><th>Category</th><th class="right">Amount</th></tr></thead><tbody><tr><td>Gross Sales</td><td class="right bold">${fmt(birGross)}</td></tr><tr><td>VATable Sales</td><td class="right">${fmt(birVatable)}</td></tr><tr><td><b>Output VAT (12%)</b></td><td class="right bold" style="color:#4f46e5">${fmt(birVat)}</td></tr><tr><td>VAT-Exempt Sales</td><td class="right">${fmt(birExempt)}</td></tr><tr><td>Zero-Rated</td><td class="right">₱0.00</td></tr><tr><td>Total Orders</td><td class="right">${birOrders.length}</td></tr></tbody></table><div style="margin-top:14px;padding:10px 14px;background:#fef3c7;border-radius:8px;font-size:11px;color:#92400e">⚠️ For reference only. Consult your licensed accountant for official BIR filings.</div>`,`BIR Tax — ${store?.store_name}`);
@@ -737,22 +749,74 @@ function Reports({store,data,primary}){
           </Card>}
         </div>
       </>}
-      {tab==="shifts"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
-        {shifts.length===0&&<Card><div style={{textAlign:"center",color:"#9ca3af",padding:"24px 0",fontSize:13}}>No completed shifts yet</div></Card>}
-        {shifts.map(s=>(
-          <Card key={s.id}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,flexWrap:"wrap",gap:6}}>
-              <div><div style={{fontWeight:800,fontSize:13}}>{s.cashier}</div><div style={{fontSize:11,color:"#9ca3af"}}>{s.startTime} → {s.endTime}</div></div>
-              <span style={{fontSize:13,fontWeight:800,padding:"3px 10px",borderRadius:10,background:s.overShort>=0?"#f0fdf4":"#fef2f2",color:s.overShort>=0?"#166534":"#991b1b"}}>{s.overShort>=0?"+":""}{fmt(s.overShort)}</span>
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(90px,1fr))",gap:7}}>
-              {[{l:"Sales",v:fmt(s.totalSales)},{l:"Opening",v:fmt(s.openCash)},{l:"Closing",v:fmt(s.closeCash)},{l:"Expenses",v:fmt(s.totalExpenses||0)},{l:"Orders",v:s.shiftOrders}].map(m=>(
-                <div key={m.l} style={{background:"#f9fafb",borderRadius:8,padding:"6px 10px"}}><div style={{fontSize:10,color:"#9ca3af"}}>{m.l}</div><div style={{fontSize:13,fontWeight:800}}>{m.v}</div></div>
+      {tab==="shifts"&&(()=>{
+        const filteredShifts=shifts.filter(s=>{
+          const dk=s.startDateKey||(s.startTime?s.startTime.slice(0,10):"");
+          if(shiftPeriod==="today")  return dk===todayKey();
+          if(shiftPeriod==="week")   return dk>=weekStart();
+          if(shiftPeriod==="month")  return dk>=monthStart();
+          if(shiftPeriod==="custom") return(!shiftFrom||dk>=shiftFrom)&&(!shiftTo||dk<=shiftTo);
+          return true;
+        });
+        const shiftTotalSales=filteredShifts.reduce((s,x)=>s+(x.totalSales||0),0);
+        const shiftTotalExpenses=filteredShifts.reduce((s,x)=>s+(x.totalExpenses||0),0);
+        const shiftTotalOrders=filteredShifts.reduce((s,x)=>s+(x.shiftOrders||0),0);
+        const shiftOverShort=filteredShifts.reduce((s,x)=>s+(x.overShort||0),0);
+        return(
+          <div>
+            {/* Period filter */}
+            <div style={{display:"flex",gap:5,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
+              {[["all","All Time"],["today","Today"],["week","This Week"],["month","This Month"],["custom","Custom"]].map(([k,l])=>(
+                <button key={k} onClick={()=>setShiftPeriod(k)} style={{padding:"5px 12px",borderRadius:6,border:"1px solid",cursor:"pointer",fontSize:11,fontWeight:700,borderColor:shiftPeriod===k?primary:"#e5e7eb",background:shiftPeriod===k?primary:"#fff",color:shiftPeriod===k?"#fff":"#6b7280",whiteSpace:"nowrap"}}>{l}</button>
               ))}
             </div>
-          </Card>
-        ))}
-      </div>}
+            {/* Custom range */}
+            {shiftPeriod==="custom"&&(
+              <Card style={{marginBottom:10,padding:"10px 14px"}}>
+                <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}><label style={{...LBL,margin:0}}>From</label><input type="date" value={shiftFrom} onChange={e=>setShiftFrom(e.target.value)} style={{...INP,width:"auto",padding:"5px 9px"}}/></div>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}><label style={{...LBL,margin:0}}>To</label><input type="date" value={shiftTo} onChange={e=>setShiftTo(e.target.value)} style={{...INP,width:"auto",padding:"5px 9px"}}/></div>
+                  <button onClick={()=>{setShiftFrom("");setShiftTo("");}} style={{padding:"5px 10px",border:"1px solid #e5e7eb",borderRadius:6,cursor:"pointer",fontSize:11,background:"#f9fafb",color:"#6b7280"}}>Clear</button>
+                </div>
+              </Card>
+            )}
+            {/* Summary cards */}
+            {filteredShifts.length>0&&(
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:10,marginBottom:14}}>
+                {[
+                  {l:"Shifts",v:filteredShifts.length,c:"#0891b2"},
+                  {l:"Total Sales",v:fmt(shiftTotalSales),c:primary},
+                  {l:"Total Orders",v:shiftTotalOrders,c:"#059669"},
+                  {l:"Expenses",v:fmt(shiftTotalExpenses),c:"#d97706"},
+                  {l:"Over/Short",v:(shiftOverShort>=0?"+":"")+fmt(shiftOverShort),c:shiftOverShort>=0?"#166534":"#dc2626"},
+                ].map(m=>(
+                  <div key={m.l} style={{background:"#fff",borderRadius:10,padding:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+                    <div style={{fontSize:10,color:"#9ca3af",marginBottom:4}}>{m.l}</div>
+                    <div style={{fontSize:16,fontWeight:800,color:m.c}}>{m.v}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Shift list */}
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {filteredShifts.length===0&&<Card><div style={{textAlign:"center",color:"#9ca3af",padding:"24px 0",fontSize:13}}>{shifts.length===0?"No completed shifts yet":"No shifts in this period"}</div></Card>}
+              {filteredShifts.map(s=>(
+                <Card key={s.id}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,flexWrap:"wrap",gap:6}}>
+                    <div><div style={{fontWeight:800,fontSize:13}}>{s.cashier}</div><div style={{fontSize:11,color:"#9ca3af"}}>{s.startTime} → {s.endTime}</div></div>
+                    <span style={{fontSize:13,fontWeight:800,padding:"3px 10px",borderRadius:10,background:s.overShort>=0?"#f0fdf4":"#fef2f2",color:s.overShort>=0?"#166534":"#991b1b"}}>{s.overShort>=0?"+":""}{fmt(s.overShort)}</span>
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(90px,1fr))",gap:7}}>
+                    {[{l:"Sales",v:fmt(s.totalSales)},{l:"Opening",v:fmt(s.openCash)},{l:"Closing",v:fmt(s.closeCash)},{l:"Expenses",v:fmt(s.totalExpenses||0)},{l:"Orders",v:s.shiftOrders}].map(m=>(
+                      <div key={m.l} style={{background:"#f9fafb",borderRadius:8,padding:"6px 10px"}}><div style={{fontSize:10,color:"#9ca3af"}}>{m.l}</div><div style={{fontSize:13,fontWeight:800}}>{m.v}</div></div>
+                    ))}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
       {tab==="bir"&&(
         <div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:14}}>
