@@ -1626,12 +1626,6 @@ function Settings({store,data,session,saveField,onRefresh,setStore}){
             <FRow label="VAT Percentage (%)"><input type="number" value={osForm.vatPercent} onChange={e=>setOsForm(f=>({...f,vatPercent:parseFloat(e.target.value)||0}))} min={0} max={100} style={{...INP,maxWidth:120}}/></FRow>
           </Card>
           <Card>
-            <SectionTitle>Open Bills</SectionTitle>
-            <div style={{fontSize:12,color:"#9ca3af",marginBottom:12}}>Allow cashiers to save an order and let customers pay later or add more items. Common in eateries and restaurants.</div>
-            <Toggle checked={osForm.enableOpenBills||false} onChange={v=>setOsForm(f=>({...f,enableOpenBills:v}))} label="Enable Open Bills (Pay Later)"/>
-            {osForm.enableOpenBills&&<div style={{marginTop:10,padding:"8px 12px",background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:8,fontSize:12,color:"#c2410c"}}>When enabled, cashiers will see a \"Save as Open Bill\" button in the payment screen of the POS App.</div>}
-          </Card>
-          <Card>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
               <div><SectionTitle>Order Types</SectionTitle><div style={{fontSize:11,color:"#9ca3af",marginTop:-10,marginBottom:8}}>Shown above discount section in cart</div></div>
               <button onClick={addOrderType} style={{padding:"5px 12px",background:"#4f46e5",color:"#fff",border:"none",borderRadius:7,cursor:"pointer",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:4}}><i className="ti ti-plus"/>Add</button>
