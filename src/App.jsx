@@ -541,7 +541,7 @@ function LoginScreen({onLogin}){
             </div>
           </>)}
         </div>
-        <div style={{marginTop:14,textAlign:"center",fontSize:11,color:"rgba(255,255,255,0.25)"}}>POS Pro Owner Portal · pospro-portal.com</div>
+        <div style={{marginTop:14,textAlign:"center",fontSize:11,color:"rgba(255,255,255,0.25)"}}>POS Pro Owner Portal · client.pospro-portal.com</div>
       </div>
     </div>
   );
