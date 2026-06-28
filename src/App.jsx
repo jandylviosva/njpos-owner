@@ -780,9 +780,47 @@ function Reports({store,data,primary}){
           </Card>}
         </div>
       </>}
-      {tab==="shifts"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
-        {shifts.length===0&&<Card><div style={{textAlign:"center",color:"#9ca3af",padding:"24px 0",fontSize:13}}>No completed shifts yet</div></Card>}
-        {shifts.map(s=>(
+      {tab==="shifts"&&(()=>{
+        const [shiftPeriod,setShiftPeriod]=React.useState("all");
+        const [shiftFrom,setShiftFrom]=React.useState("");
+        const [shiftTo,setShiftTo]=React.useState("");
+        const [shiftCashier,setShiftCashier]=React.useState("all");
+        const now=new Date();
+        const todayStr=now.toISOString().slice(0,10);
+        const weekStartStr=new Date(now.getFullYear(),now.getMonth(),now.getDate()-now.getDay()).toISOString().slice(0,10);
+        const monthStartStr=new Date(now.getFullYear(),now.getMonth(),1).toISOString().slice(0,10);
+        const cashierList=[...new Set(shifts.map(s=>s.cashier).filter(Boolean))].sort();
+        const filteredShifts=shifts.filter(s=>{
+          const d=(s.startDateKey||s.startTime||"").slice(0,10);
+          if(shiftPeriod==="today")  return d===todayStr;
+          if(shiftPeriod==="week")   return d>=weekStartStr;
+          if(shiftPeriod==="month")  return d>=monthStartStr;
+          if(shiftPeriod==="custom") return (!shiftFrom||d>=shiftFrom)&&(!shiftTo||d<=shiftTo);
+          return true;
+        }).filter(s=>shiftCashier==="all"||s.cashier===shiftCashier);
+        const filteredSales=filteredShifts.reduce((s,x)=>s+(x.totalSales||0),0);
+        return(<div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,alignItems:"center",marginBottom:4}}>
+            {[{v:"all",l:"All"},{v:"today",l:"Today"},{v:"week",l:"This Week"},{v:"month",l:"This Month"},{v:"custom",l:"Custom"}].map(o=>(
+              <button key={o.v} onClick={()=>setShiftPeriod(o.v)} style={{padding:"4px 12px",borderRadius:6,border:`1px solid ${shiftPeriod===o.v?(primary||"#4f46e5"):"#e5e7eb"}`,background:shiftPeriod===o.v?(primary||"#4f46e5"):"#fff",color:shiftPeriod===o.v?"#fff":"#6b7280",fontSize:12,fontWeight:700,cursor:"pointer"}}>{o.l}</button>
+            ))}
+            {shiftPeriod==="custom"&&<>
+              <input type="date" value={shiftFrom} onChange={e=>setShiftFrom(e.target.value)} style={{padding:"4px 8px",border:"1px solid #e5e7eb",borderRadius:6,fontSize:12}}/>
+              <span style={{fontSize:12,color:"#9ca3af"}}>to</span>
+              <input type="date" value={shiftTo} onChange={e=>setShiftTo(e.target.value)} style={{padding:"4px 8px",border:"1px solid #e5e7eb",borderRadius:6,fontSize:12}}/>
+            </>}
+            {cashierList.length>1&&(
+              <select value={shiftCashier} onChange={e=>setShiftCashier(e.target.value)} style={{padding:"4px 10px",border:"1px solid #e5e7eb",borderRadius:6,fontSize:12,fontWeight:700,color:"#374151",background:"#fff",cursor:"pointer"}}>
+                <option value="all">All Staff</option>
+                {cashierList.map(c=><option key={c} value={c}>{c}</option>)}
+              </select>
+            )}
+            {filteredShifts.length!==shifts.length&&(
+              <span style={{fontSize:11,color:"#9ca3af",marginLeft:4}}>{filteredShifts.length} of {shifts.length} shifts · {fmt(filteredSales)} total</span>
+            )}
+          </div>
+          {filteredShifts.length===0&&<Card><div style={{textAlign:"center",color:"#9ca3af",padding:"24px 0",fontSize:13}}>{shifts.length===0?"No completed shifts yet":"No shifts in selected period"}</div></Card>}
+          {filteredShifts.map(s=>(
           <Card key={s.id}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,flexWrap:"wrap",gap:6}}>
               <div><div style={{fontWeight:800,fontSize:13}}>{s.cashier}</div><div style={{fontSize:11,color:"#9ca3af"}}>{s.startTime} → {s.endTime}</div></div>
@@ -805,7 +843,8 @@ function Reports({store,data,primary}){
             )}
           </Card>
         ))}
-      </div>}
+        </div>);
+      })()}
       {tab==="bir"&&(
         <div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:14}}>
