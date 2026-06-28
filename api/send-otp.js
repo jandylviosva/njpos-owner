@@ -8,6 +8,7 @@ const ALLOWED_ORIGINS = [
   "https://pospro-portal.com",
   "https://pospro-pwa.vercel.app",
   "https://pwa.pospro-portal.com",
+  "https://client.pospro-portal.com",
 ];
 
 function setCorsHeaders(req, res) {
@@ -76,6 +77,48 @@ export default async function handler(req, res) {
       const data = await r.json();
       if (!r.ok) return res.status(500).json({ error: "Failed to send report", detail: data });
       return res.status(200).json({ ok: true });
+    } catch(e) {
+      return res.status(500).json({ error: "Server error" });
+    }
+  }
+
+  // ── TRIAL EXPIRED EMAIL ──
+  if (purpose === "trial_expired") {
+    try {
+      const r = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${RESEND_KEY}` },
+        body: JSON.stringify({
+          from: "POS Pro <noreply@pospro-portal.com>",
+          to: [email],
+          subject: "Your POS Pro Trial Has Expired",
+          html: `
+            <div style="font-family:sans-serif;max-width:460px;margin:0 auto;padding:24px">
+              <div style="background:#4f46e5;border-radius:12px;padding:18px;text-align:center;margin-bottom:20px">
+                <div style="color:#fff;font-size:20px;font-weight:800">POS Pro</div>
+                <div style="color:rgba(255,255,255,0.6);font-size:12px">${storeName||"Your Store"}</div>
+              </div>
+              <h2 style="font-size:16px;color:#111;margin-bottom:8px">Your free trial has ended ⏰</h2>
+              <p style="color:#6b7280;font-size:13px;margin-bottom:18px;line-height:1.6">
+                Your 3-day free trial for <b>${storeName||"your store"}</b> has expired.
+                Your store data is fully preserved — you just need an activation code to continue.
+              </p>
+              <div style="background:#f5f3ff;border:2px solid #c4b5fd;border-radius:12px;padding:16px;margin-bottom:16px">
+                <div style="font-weight:800;font-size:14px;color:#5b21b6;margin-bottom:8px">To continue using POS Pro:</div>
+                <ol style="color:#6b7280;font-size:13px;padding-left:16px;margin:0;line-height:1.8">
+                  <li>Contact your POS Pro provider</li>
+                  <li>Purchase a permanent activation code</li>
+                  <li>Enter the code on the POS app to unlock your store</li>
+                </ol>
+              </div>
+              <p style="color:#9ca3af;font-size:11px;margin-top:20px">
+                All your products, orders, and data are still safely stored and will be restored once you activate with a permanent code.
+              </p>
+            </div>
+          `,
+        }),
+      });
+      return res.status(r.ok ? 200 : 500).json({ ok: r.ok });
     } catch(e) {
       return res.status(500).json({ error: "Server error" });
     }
