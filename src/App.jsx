@@ -769,11 +769,21 @@ function Reports({store,data,primary}){
               <div><div style={{fontWeight:800,fontSize:13}}>{s.cashier}</div><div style={{fontSize:11,color:"#9ca3af"}}>{s.startTime} → {s.endTime}</div></div>
               <span style={{fontSize:13,fontWeight:800,padding:"3px 10px",borderRadius:10,background:s.overShort>=0?"#f0fdf4":"#fef2f2",color:s.overShort>=0?"#166534":"#991b1b"}}>{s.overShort>=0?"+":""}{fmt(s.overShort)}</span>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(90px,1fr))",gap:7}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(90px,1fr))",gap:7,marginBottom:s.payBreakdown&&Object.keys(s.payBreakdown).length>1?8:0}}>
               {[{l:"Sales",v:fmt(s.totalSales)},{l:"Opening",v:fmt(s.openCash)},{l:"Closing",v:fmt(s.closeCash)},{l:"Expenses",v:fmt(s.totalExpenses||0)},{l:"Orders",v:s.shiftOrders}].map(m=>(
                 <div key={m.l} style={{background:"#f9fafb",borderRadius:8,padding:"6px 10px"}}><div style={{fontSize:10,color:"#9ca3af"}}>{m.l}</div><div style={{fontSize:13,fontWeight:800}}>{m.v}</div></div>
               ))}
             </div>
+            {s.payBreakdown&&Object.keys(s.payBreakdown).length>0&&(
+              <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:4}}>
+                <span style={{fontSize:10,color:"#9ca3af",fontWeight:600,alignSelf:"center"}}>PAYMENTS:</span>
+                {Object.entries(s.payBreakdown).map(([method,amt])=>(
+                  <span key={method} style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:8,background:method==="cash"?"#dcfce7":"#eff6ff",color:method==="cash"?"#166534":"#1e40af"}}>
+                    {method.charAt(0).toUpperCase()+method.slice(1)}: {fmt(amt)}
+                  </span>
+                ))}
+              </div>
+            )}
           </Card>
         ))}
       </div>}
