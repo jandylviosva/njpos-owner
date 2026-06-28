@@ -1507,7 +1507,13 @@ function Settings({store,data,session,saveField,onRefresh,setStore}){
   const [osForm,setOsForm]=useState({
     vatEnabled:  orderSettings.vatEnabled||false,
     vatPercent:  orderSettings.vatPercent||12,
-    orderTypes:  orderSettings.orderTypes||[],
+    orderTypes:  (()=>{
+      const types = orderSettings.orderTypes||[];
+      const BUILT_INS=[{id:"ot1",label:"Dine-in",enabled:false,locked:true},{id:"ot2",label:"Take-out",enabled:false,locked:true}];
+      const hasOt1=types.some(t=>t.id==="ot1"), hasOt2=types.some(t=>t.id==="ot2");
+      if(!hasOt1||!hasOt2) return [...BUILT_INS.filter(bi=>!types.some(t=>t.id===bi.id)),...types.map(t=>(t.id==="ot1"||t.id==="ot2")?{...t,locked:true}:t)];
+      return types;
+    })(),
     orderSources:orderSettings.orderSources||[],
     orderNumPrefix: orderSettings.orderNumPrefix||"ORD",
     orderNumFormat: orderSettings.orderNumFormat||"prefix-datetime",
@@ -1630,13 +1636,21 @@ function Settings({store,data,session,saveField,onRefresh,setStore}){
               <div><SectionTitle>Order Types</SectionTitle><div style={{fontSize:11,color:"#9ca3af",marginTop:-10,marginBottom:8}}>Shown above discount section in cart</div></div>
               <button onClick={addOrderType} style={{padding:"5px 12px",background:"#4f46e5",color:"#fff",border:"none",borderRadius:7,cursor:"pointer",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:4}}><i className="ti ti-plus"/>Add</button>
             </div>
-            {osForm.orderTypes.length===0&&<div style={{fontSize:12,color:"#9ca3af"}}>No order types yet. Add one above.</div>}
+            {osForm.orderTypes.filter(t=>!t.locked).length===0&&osForm.orderTypes.filter(t=>t.locked).length===0&&<div style={{fontSize:12,color:"#9ca3af"}}>No order types yet. Add one above.</div>}
             {osForm.orderTypes.map(t=>(
-              <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,padding:"7px 10px",background:"#f9fafb",borderRadius:8}}>
-                <input type="checkbox" checked={t.enabled} onChange={e=>updOrderType(t.id,"enabled",e.target.checked)} style={{width:16,height:16,accentColor:"#4f46e5",cursor:"pointer",flexShrink:0}}/>
-                <input value={t.label} onChange={e=>updOrderType(t.id,"label",e.target.value)} placeholder="e.g. Dine-in" style={{...INP,flex:1,padding:"6px 10px"}}/>
-                <button onClick={()=>delOrderType(t.id)} style={{background:"none",border:"1px solid #fecaca",borderRadius:6,padding:"5px 7px",cursor:"pointer",color:"#ef4444",flexShrink:0}}><i className="ti ti-trash" style={{fontSize:13}}/></button>
-              </div>
+              t.locked ? (
+                <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,padding:"9px 12px",background:"#f9fafb",borderRadius:8,border:"1px solid #e5e7eb"}}>
+                  <Toggle checked={t.enabled||false} onChange={v=>updOrderType(t.id,"enabled",v)} label=""/>
+                  <span style={{flex:1,fontSize:13,fontWeight:700,color:"#374151"}}>{t.label}</span>
+                  <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:8,background:"#fef3c7",color:"#92400e"}}>Built-in</span>
+                </div>
+              ) : (
+                <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,padding:"7px 10px",background:"#f9fafb",borderRadius:8}}>
+                  <input type="checkbox" checked={t.enabled} onChange={e=>updOrderType(t.id,"enabled",e.target.checked)} style={{width:16,height:16,accentColor:"#4f46e5",cursor:"pointer",flexShrink:0}}/>
+                  <input value={t.label} onChange={e=>updOrderType(t.id,"label",e.target.value)} placeholder="e.g. Delivery" style={{...INP,flex:1,padding:"6px 10px"}}/>
+                  <button onClick={()=>delOrderType(t.id)} style={{background:"none",border:"1px solid #fecaca",borderRadius:6,padding:"5px 7px",cursor:"pointer",color:"#ef4444",flexShrink:0}}><i className="ti ti-trash" style={{fontSize:13}}/></button>
+                </div>
+              )
             ))}
           </Card>
           <Card>
