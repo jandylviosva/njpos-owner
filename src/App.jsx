@@ -566,6 +566,39 @@ function Dashboard({store,data,primary}){
   ];
   return(
     <div>
+      {/* ── TRIAL BANNER ── */}
+      {(()=>{
+        const lic = store?.license_code||"";
+        const exp = store?.trial_expires_at||data?.trial_expires_at||null;
+        if(!lic.startsWith("TRIAL")||!exp) return null;
+        const ms = new Date(exp)-new Date();
+        const expired = ms<=0;
+        const daysLeft = Math.max(0,Math.ceil(ms/(1000*60*60*24)));
+        const urgent = daysLeft<=1&&!expired;
+        if(expired) return(
+          <div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:12,padding:"14px 18px",marginBottom:16,display:"flex",alignItems:"center",gap:12}}>
+            <i className="ti ti-clock-off" style={{fontSize:22,color:"#dc2626",flexShrink:0}}/>
+            <div>
+              <div style={{fontWeight:800,color:"#dc2626",fontSize:14}}>Trial Expired</div>
+              <div style={{fontSize:12,color:"#9ca3af",marginTop:2}}>Contact your POS Pro provider to purchase a permanent activation code and continue.</div>
+            </div>
+          </div>
+        );
+        return(
+          <div style={{background:urgent?"#fef2f2":"#fef3c7",border:`1px solid ${urgent?"#fecaca":"#fde68a"}`,borderRadius:12,padding:"14px 18px",marginBottom:16,display:"flex",alignItems:"center",gap:12}}>
+            <i className={`ti ${urgent?"ti-alert-triangle":"ti-clock"}`} style={{fontSize:22,color:urgent?"#dc2626":"#d97706",flexShrink:0}}/>
+            <div>
+              <div style={{fontWeight:800,color:urgent?"#dc2626":"#92400e",fontSize:14}}>
+                {urgent?"Trial expires today!":"Free Trial Active"}
+              </div>
+              <div style={{fontSize:12,color:"#9ca3af",marginTop:2}}>
+                {daysLeft} day{daysLeft!==1?"s":""} remaining — expires {new Date(exp).toLocaleDateString("en-PH",{month:"long",day:"numeric",year:"numeric"})}. Contact your provider to upgrade.
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {activeShift&&(()=>{
         const shiftOrders=orders.filter(o=>o.shiftId===activeShift.id);
         const shiftSales=shiftOrders.reduce((s,o)=>s+o.total,0);
