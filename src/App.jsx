@@ -457,7 +457,7 @@ export default function App(){
 
       <div style={{maxWidth:1100,margin:"0 auto",padding:"20px 16px"}}>
         {loading&&!data&&<div style={{textAlign:"center",padding:80,color:"#9ca3af"}}><i className="ti ti-loader-2" style={{fontSize:40,display:"block",marginBottom:10}}/>Loading store data…</div>}
-        {data&&view==="dashboard"&&<Dashboard store={store} data={data} primary={PRIMARY}/>}
+        {data&&view==="dashboard"&&<Dashboard store={store} data={data} primary={PRIMARY} licenseRow={licenseRow}/>}
         {data&&view==="reports"  &&<Reports   store={store} data={data} primary={PRIMARY}/>}
         {data&&view==="inventory"&&<Inventory store={store} data={data} session={session} saveField={saveField} primary={PRIMARY}/>}
         {data&&view==="orders"   &&<Orders    store={store} data={data} session={session} saveField={saveField}/>}
@@ -560,7 +560,7 @@ function LoginScreen({onLogin}){
   );
 }
 // ════════════ DASHBOARD ════════════
-function Dashboard({store,data,primary}){
+function Dashboard({store,data,primary,licenseRow}){
   const orders=(data?.orders||[]).filter(o=>o.status==="paid");
   const products=data?.products||[];
   const shifts=data?.shifts||[];
