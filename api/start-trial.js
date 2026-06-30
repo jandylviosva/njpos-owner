@@ -153,12 +153,15 @@ export default async function handler(req, res) {
         <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:12px 14px;margin-bottom:18px;font-size:12px;color:#92400e">
           ⏳ <b>Trial expires:</b> ${expiryDate} (3 days from now)
         </div>
+        <a href="https://pwa.pospro-portal.com" style="display:block;text-align:center;background:#4f46e5;color:#fff;text-decoration:none;font-size:15px;font-weight:800;padding:14px;border-radius:10px;margin-bottom:18px;box-shadow:0 4px 12px rgba(79,70,229,0.35)">
+          🚀 Open POS Pro App →
+        </a>
         <p style="color:#6b7280;font-size:13px;margin-bottom:8px"><b>How to activate:</b></p>
         <ol style="color:#6b7280;font-size:13px;padding-left:18px;line-height:1.8">
-          <li>Open POS Pro on your device</li>
-          <li>Enter your email address</li>
-          <li>Enter this trial code when prompted</li>
-          <li>Set up your store details and owner account</li>
+          <li>Click <b>"Open POS Pro App"</b> above or go to <a href="https://pwa.pospro-portal.com" style="color:#4f46e5;font-weight:600">pwa.pospro-portal.com</a></li>
+          <li>Enter your email: <b>${cleanEmail}</b></li>
+          <li>Enter your trial code when prompted</li>
+          <li>Set up your store details and start selling</li>
         </ol>
         <div style="margin-top:20px;padding:12px 14px;background:#f0fdf4;border-radius:8px;font-size:12px;color:#166534">
           ✅ Full access for 3 days — no payment required to start.<br/>
