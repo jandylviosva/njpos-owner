@@ -395,9 +395,7 @@ export default function App(){
 
         {/* Logo */}
         <div style={{display:"flex",alignItems:"center",gap:8,marginRight:4,flexShrink:0}}>
-          <div style={{width:28,height:28,borderRadius:7,background:PRIMARY,display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <i className="ti ti-shopping-cart" style={{fontSize:14,color:"#fff"}}/>
-          </div>
+          <div style={{width:28,height:28,borderRadius:7,overflow:"hidden"}}><img src="/icons/icon-192.png" alt="POS Pro" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:7}}/></div>
           <div>
             <div style={{fontWeight:800,fontSize:11,lineHeight:1}}>{store?.store_name||"POS Pro"}</div>
             <div style={{fontSize:9,color:"rgba(255,255,255,0.4)",marginTop:1}}>Owner Portal</div>
@@ -428,9 +426,7 @@ export default function App(){
             {/* Drawer header */}
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,padding:"0 4px"}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
-                <div style={{width:34,height:34,borderRadius:9,background:PRIMARY,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                  <i className="ti ti-shopping-cart" style={{fontSize:17,color:"#fff"}}/>
-                </div>
+                <div style={{width:34,height:34,borderRadius:9,overflow:"hidden"}}><img src="/icons/icon-192.png" alt="POS Pro" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:9}}/></div>
                 <div>
                   <div style={{fontWeight:800,fontSize:14,color:"#fff"}}>{store?.store_name||"POS Pro"}</div>
                   <div style={{fontSize:10,color:"rgba(255,255,255,0.4)"}}>Owner Portal</div>
@@ -519,7 +515,7 @@ function LoginScreen({onLogin}){
     <div style={{minHeight:"100vh",background:BG,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"sans-serif",padding:20}}>
       <div style={{width:"100%",maxWidth:400}}>
         <div style={{textAlign:"center",marginBottom:24}}>
-          <div style={{width:66,height:66,borderRadius:18,background:"#4f46e5",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",boxShadow:"0 8px 32px rgba(79,70,229,0.5)"}}><i className="ti ti-shopping-cart" style={{fontSize:30,color:"#fff"}}/></div>
+          <div style={{width:66,height:66,borderRadius:18,overflow:"hidden",margin:"0 auto 12px",boxShadow:"0 8px 32px rgba(79,70,229,0.5)"}}><img src="/icons/icon-192.png" alt="POS Pro" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:18}}/></div>
           <div style={{fontSize:24,fontWeight:800,color:"#fff"}}>POS Pro</div>
           <div style={{fontSize:12,color:"rgba(255,255,255,0.45)",marginTop:3}}>Owner Portal</div>
         </div>
