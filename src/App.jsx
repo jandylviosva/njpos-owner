@@ -1208,9 +1208,9 @@ function Settings({store,data,session,onRefresh}){
       <div style={{display:"flex",gap:6,marginBottom:20,flexWrap:"wrap"}}>
         {TABS.map(t=><button key={t.k} onClick={()=>setSTab(t.k)} style={{padding:"6px 16px",borderRadius:8,border:"1px solid",cursor:"pointer",fontSize:13,fontWeight:700,borderColor:sTab===t.k?"#4f46e5":"#e5e7eb",background:sTab===t.k?"#4f46e5":"#fff",color:sTab===t.k?"#fff":"#6b7280"}}>{t.l}</button>)}
       </div>
-      <div style={{fontSize:11,color:"#9ca3af",marginBottom:16,padding:"8px 12px",background:"#f9fafb",borderRadius:8,border:"1px solid #e5e7eb"}}>
+      {sTab!=="devices"&&<div style={{fontSize:11,color:"#9ca3af",marginBottom:16,padding:"8px 12px",background:"#f9fafb",borderRadius:8,border:"1px solid #e5e7eb"}}>
         <i className="ti ti-lock" style={{marginRight:6}}/>Settings are read-only in the portal. To change settings, open the POS app on your device.
-      </div>
+      </div>}
       {sTab==="appearance"&&(
         <Card>
           <div style={{fontWeight:800,fontSize:14,marginBottom:14}}>Appearance</div>
