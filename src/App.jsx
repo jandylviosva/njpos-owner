@@ -938,13 +938,18 @@ function Inventory({store,data,session,primary}){
     (catFilter==="All"||p.category===catFilter)&&
     (p.name.toLowerCase().includes(search.toLowerCase())||p.sku?.includes(search))
   );
-
+  const fmt=(n)=>`₱${Number(n||0).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   return(
     <div>
       {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
         <div style={{fontWeight:800,fontSize:18}}>Inventory <span style={{fontSize:13,fontWeight:600,color:"#9ca3af"}}>({products.filter(p=>p.active).length} active / {products.length} total)</span></div>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name or SKU…" style={{...INP,width:220,padding:"7px 12px"}}/>
+      </div>
+
+      {/* Read-only notice */}
+      <div style={{fontSize:11,color:"#9ca3af",marginBottom:12,padding:"7px 12px",background:"#f9fafb",borderRadius:8,border:"1px solid #e5e7eb",display:"flex",alignItems:"center",gap:6}}>
+        <i className="ti ti-lock" style={{fontSize:12}}/>Inventory is view-only in the portal. Use the POS app to add, edit, or delete products.
       </div>
 
       {/* Category filters */}
@@ -978,7 +983,6 @@ function Inventory({store,data,session,primary}){
                       <div style={{display:"flex",gap:4,marginTop:3,flexWrap:"wrap"}}>
                         {p.recipe?.length>0&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#e0f2fe",color:"#0891b2"}}>{p.recipe.length} inclusions</span>}
                         {p.recipe?.length>0&&p.stockMode==="auto"&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#f0fdf4",color:"#16a34a"}}>⚙ auto stock</span>}
-                        {p.recipe?.length>0&&p.recipe.some(r=>{const ing=products.find(x=>x.id===r.productId);return !ing||!ing.active;})&&<span title="Some inclusions are hidden or deleted" style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#fef2f2",color:"#dc2626"}}>⚠ inclusion issue</span>}
                         {p.showInPOS===false&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#fef3c7",color:"#92400e"}}>Hidden from POS</span>}
                       </div>
                     </div>
@@ -986,15 +990,21 @@ function Inventory({store,data,session,primary}){
                 </td>
                 <td style={{padding:"10px 12px",color:"#6b7280"}}>{p.category}</td>
                 <td style={{padding:"10px 12px",fontWeight:700,color:primary||"#4f46e5"}}>{fmt(p.price)}</td>
-                <td style={{padding:"10px 12px"}}>{(()=>{
-                  const s=computeStockPortal(p,products);
-                  return(<div style={{display:"flex",alignItems:"center",gap:4}}><span style={{fontWeight:700,color:s===0?"#dc2626":s<10?"#f59e0b":"#111"}}>{s}</span>{p.stockMode==="auto"&&<span style={{fontSize:8,fontWeight:700,padding:"1px 4px",borderRadius:4,background:"#e0f2fe",color:"#0891b2"}}>AUTO</span>}</div>);
-                })()}</td>
+                <td style={{padding:"10px 12px"}}>
+                  {(()=>{
+                    const stock = p.stockMode==="auto"&&p.recipe?.length
+                      ? Math.min(...p.recipe.map(r=>{const ing=products.find(x=>x.id===r.productId);return ing?Math.floor((ing.stock||0)/r.qty):0}))
+                      : (p.stock||0);
+                    return(<div style={{display:"flex",alignItems:"center",gap:4}}>
+                      <span style={{fontWeight:700,color:stock===0?"#dc2626":stock<10?"#f59e0b":"#111"}}>{stock}</span>
+                      {p.stockMode==="auto"&&<span style={{fontSize:8,fontWeight:700,padding:"1px 4px",borderRadius:4,background:"#e0f2fe",color:"#0891b2"}}>AUTO</span>}
+                    </div>);
+                  })()}
+                </td>
                 <td style={{padding:"10px 12px",fontFamily:"monospace",fontSize:11,color:"#6b7280"}}>{p.sku||"—"}</td>
                 <td style={{padding:"10px 12px"}}>
                   <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10,background:p.active?"#f0fdf4":"#fef2f2",color:p.active?"#166534":"#991b1b"}}>{p.active?"Active":"Inactive"}</span>
                 </td>
-
               </tr>
             ))}
             {filtered.length===0&&<tr><td colSpan={6} style={{padding:"40px",textAlign:"center",color:"#9ca3af"}}>No products found</td></tr>}
@@ -1002,172 +1012,10 @@ function Inventory({store,data,session,primary}){
         </table>
         </div>
       </Card>
-
-
-      {/* Add / Edit Modal */}
-      {modal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-          <div style={{background:"#fff",borderRadius:16,padding:24,width:"100%",maxWidth:480,maxHeight:"90vh",overflow:"auto"}}>
-            <div style={{fontWeight:800,fontSize:16,marginBottom:16}}>{modal==="add"?"Add Product":"Edit Product"}</div>
-            <FRow label="Product Image">
-              <div style={{display:"flex",alignItems:"center",gap:12,marginTop:4}}>
-                <div style={{width:64,height:64,borderRadius:10,border:"2px dashed #e5e7eb",overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",background:"#f9fafb",flexShrink:0}}>
-                  {form.image?<img src={form.image} alt="product" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<i className="ti ti-photo" style={{fontSize:22,color:"#d1d5db"}}/>}
-                </div>
-                <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                  <button onClick={()=>imgRef.current.click()} style={{padding:"6px 12px",border:"1px solid #e5e7eb",borderRadius:7,cursor:"pointer",fontSize:12,background:"#f9fafb",fontWeight:700,display:"flex",alignItems:"center",gap:5}}><i className="ti ti-upload"/>Upload</button>
-                  {form.image&&<button onClick={()=>setForm(f=>({...f,image:""}))} style={{padding:"4px 10px",border:"1px solid #fecaca",borderRadius:7,cursor:"pointer",fontSize:11,background:"#fef2f2",color:"#991b1b"}}>Remove</button>}
-                </div>
-                <input ref={imgRef} type="file" accept="image/*" onChange={handleImg} style={{display:"none"}}/>
-              </div>
-            </FRow>
-            <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:10}}>
-              <FRow label="Name"><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Product name" style={INP} autoFocus/></FRow>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                <FRow label="Category">
-                  <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} style={INP}>
-                    {categories.map(c=><option key={c}>{c}</option>)}
-                  </select>
-                </FRow>
-                <FRow label="Price (₱)"><input type="number" value={form.price} onChange={e=>setForm(f=>({...f,price:e.target.value}))} style={INP}/></FRow>
-              </div>
-              {(form.stockMode||"manual")!=="auto"&&<FRow label="Stock"><input type="number" value={form.stock} onChange={e=>setForm(f=>({...f,stock:e.target.value}))} style={INP}/></FRow>}
-              {(form.stockMode||"manual")==="auto"&&form.recipe?.length>0&&<div style={{padding:"8px 12px",background:"#e0f2fe",borderRadius:8,fontSize:12,color:"#0891b2",fontWeight:600}}>⚙ Stock auto-computed from inclusions</div>}
-              {form.recipe?.length>0&&(
-                <FRow label="Stock Mode">
-                  <div style={{display:"flex",gap:8,marginTop:4}}>
-                    {["manual","auto"].map(m=>(
-                      <button key={m} onClick={()=>setForm(f=>({...f,stockMode:m}))} style={{flex:1,padding:"7px 0",borderRadius:8,border:`1.5px solid ${(form.stockMode||"manual")===m?"#4f46e5":"#e5e7eb"}`,background:(form.stockMode||"manual")===m?"#4f46e5":"#fff",color:(form.stockMode||"manual")===m?"#fff":"#6b7280",fontSize:12,fontWeight:700,cursor:"pointer"}}>
-                        {m==="auto"?"⚙ Auto (from inclusions)":"Manual"}
-                      </button>
-                    ))}
-                  </div>
-                  {(form.stockMode||"manual")==="auto"&&<div style={{fontSize:11,color:"#0891b2",marginTop:5}}>Stock = minimum servings possible from inclusion stocks</div>}
-                </FRow>
-              )}
-              <FRow label="SKU"><input value={form.sku} onChange={e=>setForm(f=>({...f,sku:e.target.value.toUpperCase()}))} style={{...INP,fontFamily:"monospace"}}/></FRow>
-              <FRow label="Status">
-                <select value={form.active?"active":"hidden"} onChange={e=>setForm(f=>({...f,active:e.target.value==="active"}))} style={INP}>
-                  <option value="active">Active</option>
-                  <option value="hidden">Inactive</option>
-                </select>
-              </FRow>
-              <FRow label="Show in POS">
-                <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",marginTop:4}}>
-                  <div onClick={()=>setForm(f=>({...f,showInPOS:!(f.showInPOS!==false)}))} style={{width:40,height:22,borderRadius:11,background:form.showInPOS!==false?"#4f46e5":"#d1d5db",position:"relative",transition:"background 0.2s",flexShrink:0,cursor:"pointer"}}>
-                    <div style={{width:18,height:18,borderRadius:"50%",background:"#fff",position:"absolute",top:2,left:form.showInPOS!==false?20:2,transition:"left 0.2s",boxShadow:"0 1px 3px rgba(0,0,0,0.2)"}}/>
-                  </div>
-                  <span style={{fontSize:12,color:"#6b7280"}}>{form.showInPOS!==false?"Visible in POS cashier grid":"Hidden from POS cashier grid (inclusions, internal items)"}</span>
-                </label>
-              </FRow>
-              <FRow label="Inclusions" hint="optional — deducts stock on sale">
-                <div style={{marginTop:4}}>
-                  {(form.recipe||[]).map((r,i)=>{
-                    const selProd = r.productId ? products.find(p=>p.id===r.productId) : null;
-                    return(
-                    <div key={i} style={{display:"flex",gap:6,alignItems:"center",marginBottom:6}}>
-                      <div style={{flex:2}}>
-                        <ProductSearchSelect
-                          products={products}
-                          value={selProd?.name||""}
-                          excludeId={form.id}
-                          placeholder="Search inclusion…"
-                          onSelect={(p)=>{const rec=[...(form.recipe||[])];rec[i]={...rec[i],productId:p.id};setForm(f=>({...f,recipe:rec}));}}
-                        />
-                      </div>
-                      <input type="number" min={0.01} step={0.01} value={r.qty||""} onChange={e=>{const rec=[...(form.recipe||[])];rec[i]={...rec[i],qty:parseFloat(e.target.value)||0};setForm(f=>({...f,recipe:rec}));}} placeholder="Qty" style={{...INP,width:70,padding:"6px 8px",textAlign:"center"}}/>
-                      <button onClick={()=>{const rec=(form.recipe||[]).filter((_,j)=>j!==i);setForm(f=>({...f,recipe:rec}));}} style={{padding:"5px 8px",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:6,cursor:"pointer",color:"#dc2626",flexShrink:0}}>✕</button>
-                    </div>
-                    );
-                  })}
-                  <button onClick={()=>setForm(f=>({...f,recipe:[...(f.recipe||[]),{productId:"",qty:1}]}))} style={{padding:"5px 12px",border:"1.5px dashed #d1d5db",borderRadius:7,cursor:"pointer",fontSize:11,color:"#6b7280",background:"#f9fafb",width:"100%"}}>+ Add Inclusion</button>
-                </div>
-              </FRow>
-              {msg&&<div style={{fontSize:12,color:msg==="Saved!"?"#166534":"#dc2626",fontWeight:700}}>{msg}</div>}
-              <div style={{display:"flex",gap:8,marginTop:4}}>
-                <button onClick={()=>setModal(null)} style={{flex:1,padding:"10px 0",border:"1px solid #e5e7eb",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700}}>Cancel</button>
-                <button onClick={save} disabled={saving} style={{flex:2,padding:"10px 0",background:saving?"#a5b4fc":(primary||"#4f46e5"),color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:800}}>{saving?"Saving…":modal==="add"?"Add Product":"Save Changes"}</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* ── ACTION MENU MODAL ── */}
-      {updateModal?.action==="menu"&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-          <div style={{background:"#fff",borderRadius:16,padding:24,width:"100%",maxWidth:360,maxHeight:"90vh",overflowY:"auto"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-              <div style={{fontWeight:800,fontSize:15}}>Update: {updateModal.product.name}</div>
-              <button onClick={()=>setUpdateModal(null)} style={{background:"none",border:"none",cursor:"pointer",fontSize:20,color:"#9ca3af"}}>✕</button>
-            </div>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {[{id:"rename",label:"Rename",icon:"ti-pencil",color:"#4f46e5"},{id:"category",label:"Change Category",icon:"ti-tag",color:"#0891b2"},{id:"price",label:"Adjust Price",icon:"ti-currency-peso",color:"#059669"},{id:"image",label:"Update Image",icon:"ti-photo",color:"#7c3aed"},{id:"add_stock",label:"Add Stock",icon:"ti-plus",color:"#16a34a"},{id:"remove_stock",label:"Remove Stock",icon:"ti-minus",color:"#dc2626"},{id:"sku",label:"Edit SKU",icon:"ti-barcode",color:"#7c3aed"},{id:"status",label:"Toggle Status",icon:"ti-eye",color:"#6b7280"},{id:"showInPOS",label:"Toggle POS Visibility",icon:"ti-layout-grid",color:"#7c3aed"},{id:"stockMode",label:"Stock Mode",icon:"ti-settings-automation",color:"#7c3aed"}].map(a=>(
-                <button key={a.id} onClick={()=>{
-                  if(a.id==="status"){const p=updateModal.product;const upd=products.map(x=>x.id===p.id?{...x,active:!x.active}:x);saveField("products",upd).then(ok=>{if(ok)addPortalLog("INVENTORY","status",`Status changed: ${p.name} — ${p.active?"Active → Inactive":"Inactive → Active"}`);});setUpdateModal(null);}
-                  else if(a.id==="showInPOS"){const p=updateModal.product;const nv=p.showInPOS===false?true:false;const upd=products.map(x=>x.id===p.id?{...x,showInPOS:nv}:x);saveField("products",upd).then(ok=>{if(ok)addPortalLog("INVENTORY","showInPOS",`POS visibility: ${p.name} — ${nv?"Now visible in POS":"Now hidden from POS"}`);});setUpdateModal(null);}
-                  else if(a.id==="stockMode"){const p=updateModal.product;if(!p.recipe?.length)return;const nm=p.stockMode==="auto"?"manual":"auto";const upd=products.map(x=>x.id===p.id?{...x,stockMode:nm}:x);saveField("products",upd).then(ok=>{if(ok)addPortalLog("INVENTORY","stockMode",`Stock mode: ${p.name} → ${nm}`);});setUpdateModal(null);}
-                  else{setUpdateModal({...updateModal,action:a.id});setActionVal(a.id==="category"?updateModal.product.category:"");setActionVal2("");}
-                }} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",background:"#f9fafb",border:"1px solid #e5e7eb",borderRadius:8,cursor:"pointer",textAlign:"left"}}>
-                  <div style={{width:34,height:34,borderRadius:9,background:a.color+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><i className={`ti ${a.icon}`} style={{fontSize:17,color:a.color}}/></div>
-                  <span style={{fontWeight:700,fontSize:13,color:"#374151",flex:1}}>{a.label}</span>
-                  {a.id==="status"&&<span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:10,background:updateModal.product.active?"#f0fdf4":"#fef2f2",color:updateModal.product.active?"#166534":"#991b1b"}}>{updateModal.product.active?"Active":"Inactive"}</span>}
-                  {a.id!=="status"&&<i className="ti ti-chevron-right" style={{fontSize:15,color:"#d1d5db"}}/>}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── ACTION SUB-MODALS ── */}
-      {updateModal&&updateModal.action!=="menu"&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-          <div style={{background:"#fff",borderRadius:16,padding:24,width:"100%",maxWidth:420,maxHeight:"90vh",overflowY:"auto"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-              <div style={{fontWeight:800,fontSize:15}}>{updateModal.action==="rename"?"Rename":updateModal.action==="category"?"Change Category":updateModal.action==="price"?"Adjust Price":updateModal.action==="image"?"Update Image":updateModal.action==="add_stock"?"Add Stock":updateModal.action==="remove_stock"?"Remove Stock":updateModal.action==="sku"?"Edit SKU":updateModal.action==="delete"?"Delete Product":"Update"}</div>
-              <button onClick={()=>setUpdateModal(null)} style={{background:"none",border:"none",cursor:"pointer",fontSize:20,color:"#9ca3af"}}>✕</button>
-            </div>
-            <div style={{background:"#f9fafb",borderRadius:8,padding:"8px 12px",marginBottom:14,fontSize:12,color:"#6b7280"}}>Product: <b style={{color:"#111"}}>{updateModal.product.name}</b></div>
-            {updateModal.action==="rename"&&<FRow label="New Name"><input value={actionVal} onChange={e=>setActionVal(e.target.value)} placeholder={updateModal.product.name} style={INP} autoFocus onKeyDown={e=>e.key==="Enter"&&doAction()}/></FRow>}
-            {updateModal.action==="category"&&<FRow label="New Category"><select value={actionVal} onChange={e=>setActionVal(e.target.value)} style={INP}>{categories.map(c=><option key={c} value={c}>{c}</option>)}</select></FRow>}
-            {updateModal.action==="price"&&<FRow label={`New Price (current: ₱${updateModal.product.price})`}><input type="number" value={actionVal} onChange={e=>setActionVal(e.target.value)} placeholder="0.00" style={INP} autoFocus/></FRow>}
-            {updateModal.action==="add_stock"&&<><FRow label={`Qty to Add (current: ${updateModal.product.stock})`}><input type="number" value={actionVal} onChange={e=>setActionVal(e.target.value)} placeholder="0" style={INP} autoFocus/></FRow><div style={{marginTop:10}}><FRow label="Note (optional)"><input value={actionVal2} onChange={e=>setActionVal2(e.target.value)} placeholder="e.g. Restock delivery" style={INP}/></FRow></div></>}
-            {updateModal.action==="remove_stock"&&<><FRow label={`Qty to Remove (current: ${updateModal.product.stock})`}><input type="number" value={actionVal} onChange={e=>setActionVal(e.target.value)} placeholder="0" style={INP} autoFocus/></FRow><div style={{marginTop:10}}><FRow label="Reason (required)"><input value={actionVal2} onChange={e=>setActionVal2(e.target.value)} placeholder="e.g. Damaged, Expired…" style={INP}/></FRow></div></>}
-            {updateModal.action==="sku"&&<FRow label={`New SKU (current: ${updateModal.product.sku||"none"})`}><input value={actionVal} onChange={e=>setActionVal(e.target.value.toUpperCase())} placeholder="e.g. SW00001" style={{...INP,fontFamily:"monospace",fontWeight:700}} autoFocus/></FRow>}
-            {updateModal.action==="image"&&(
-              <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:14}}>
-                <div style={{width:80,height:80,borderRadius:10,border:"2px dashed #e5e7eb",overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",background:"#f9fafb",flexShrink:0}}>
-                  {(actionVal&&actionVal!=="__remove__")||(!actionVal&&updateModal.product.image)?<img src={actionVal&&actionVal!=="__remove__"?actionVal:updateModal.product.image} alt="preview" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<i className="ti ti-photo" style={{fontSize:28,color:"#d1d5db"}}/>}
-                </div>
-                <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                  <button onClick={()=>{const inp=document.createElement("input");inp.type="file";inp.accept="image/*";inp.onchange=async e=>{const f=e.target.files[0];if(!f)return;const c=await compressImage(f);const sId=getSession()?.storeId||"";const url=sId?await supa.uploadImage(sId,updateModal.product.id,c):null;setActionVal(url||c);};inp.click();}} style={{padding:"7px 14px",border:"1px solid #e5e7eb",borderRadius:7,cursor:"pointer",fontSize:12,background:"#f9fafb",fontWeight:700,display:"flex",alignItems:"center",gap:5}}><i className="ti ti-upload"/>Upload</button>
-                  {(actionVal||updateModal.product.image)&&<button onClick={()=>setActionVal("__remove__")} style={{padding:"5px 12px",border:"1px solid #fecaca",borderRadius:7,cursor:"pointer",fontSize:11,background:"#fef2f2",color:"#991b1b"}}>Remove Image</button>}
-                </div>
-              </div>
-            )}
-            {updateModal.action==="delete"&&(
-              <div>
-                <div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
-                  <div style={{fontWeight:700,color:"#991b1b",marginBottom:4}}>⚠️ Delete "{updateModal.product.name}"?</div>
-                  <div style={{fontSize:12,color:"#6b7280"}}>This cannot be undone.</div>
-                  {updateModal.product.stock>0&&<div style={{fontSize:12,color:"#dc2626",marginTop:6,fontWeight:700}}>{updateModal.product.stock} units of stock will be lost.</div>}
-                </div>
-                <FRow label="Reason" hint="optional"><input value={actionVal2} onChange={e=>setActionVal2(e.target.value)} placeholder="e.g. Discontinued…" style={INP} autoFocus/></FRow>
-              </div>
-            )}
-            <div style={{display:"flex",gap:8,marginTop:16}}>
-              <button onClick={()=>setUpdateModal({...updateModal,action:"menu"})} style={{flex:1,padding:"10px 0",border:"1px solid #e5e7eb",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700}}>← Back</button>
-              <button onClick={doAction} disabled={actionLoading} style={{flex:2,padding:"10px 0",background:actionLoading?"#a5b4fc":updateModal.action==="delete"?"#dc2626":(primary||"#4f46e5"),color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:800}}>
-                {actionLoading?"Saving…":updateModal.action==="delete"?"Delete Product":"Confirm"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }
+
 
 // ════════════ ORDERS ════════════
 function Orders({store,data,session,saveField}){
