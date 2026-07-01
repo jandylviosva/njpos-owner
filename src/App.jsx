@@ -475,7 +475,7 @@ export default function App(){
         {data&&view==="inventory"&&<Inventory store={store} data={data} session={session} saveField={saveField} primary={PRIMARY}/>}
         {data&&view==="orders"   &&<Orders    store={store} data={data} session={session} saveField={saveField}/>}
         {data&&view==="accounts" &&<Accounts  store={store} data={data} session={session} saveField={saveField}/>}
-        {data&&view==="settings" &&<Settings  store={store} data={data} session={session} saveField={saveField} onRefresh={()=>loadData(session.storeId)} setStore={setStore}/>}
+        {data&&view==="settings" &&<Settings  store={store} data={data} session={session} onRefresh={()=>loadData(session.storeId)}/>}
       </div>
     </div>
   );
@@ -935,23 +935,8 @@ function Inventory({store,data,session,saveField,primary}){
   const skuSettings=data?.sku_settings||{prefix:"SW",suffix:"",counter:0};
   const [search,setSearch]=useState("");
   const [catFilter,setCat]=useState("All");
-  const [modal,setModal]=useState(null); // null | "add" | "edit"
-  const [form,setForm]=useState({});
-  const [saving,setSaving]=useState(false);
-  const [msg,setMsg]=useState("");
-  const [deleteModal,setDeleteModal]=useState(null);
-  const [deleteReason,setDeleteReason]=useState("");
-  const [deleting,setDeleting]=useState(false);
-  const [updateModal,setUpdateModal]=useState(null);
-  const [actionVal,setActionVal]=useState("");
-  const [actionVal2,setActionVal2]=useState("");
-  const [actionLoading,setActionLoading]=useState(false);
-  // CSV
-  const [importModal,setImportModal]=useState(false);
-  const [importRows,setImportRows]=useState([]);
-  const [importErrors,setImportErrors]=useState([]);
-  const [importing,setImporting]=useState(false);
-  const csvRef=useRef(null);
+  // Portal inventory is read-only — no write state
+
   const imgRef=useRef(null);
 
   const genNextSKU=()=>{
@@ -959,144 +944,12 @@ function Inventory({store,data,session,saveField,primary}){
     return `${(skuSettings.prefix||"SW").toUpperCase()}${String(counter).padStart(5,"0")}${(skuSettings.suffix||"").toUpperCase()}`;
   };
 
-  const openAdd=()=>{setForm({id:"p"+uid(),name:"",price:"",category:categories[0]||"Food",stock:0,sku:genNextSKU(),active:true,image:"",showInPOS:true,recipe:[],stockMode:"manual"});setModal("add");setMsg("");};
-  const openEdit=(p)=>{setForm({...p,price:String(p.price),stock:String(p.stock)});setModal("edit");setMsg("");};
-
-  const save=async()=>{
-    if(!form.name||!form.price){setMsg("Name and price are required");return;}
-    setSaving(true);
-    let updated;
-    if(modal==="add"){
-      updated=[...products,{...form,price:parseFloat(form.price)||0,stock:parseInt(form.stock)||0}];
-      await saveField("sku_settings",{...skuSettings,counter:(skuSettings.counter||0)+1});
-    } else {
-      updated=products.map(p=>p.id===form.id?{...form,price:parseFloat(form.price)||0,stock:parseInt(form.stock)||0}:p);
-    }
-    const ok=await saveField("products",updated);
-    setSaving(false);setMsg(ok?"Saved!":"Failed to save.");
-    if(ok)setTimeout(()=>{setModal(null);setMsg("");},700);
-  };
-
-  const doDelete=async()=>{
-    if(!deleteModal)return;
-    setDeleting(true);
-    const updated=products.filter(p=>p.id!==deleteModal.id);
-    const ok=await saveField("products",updated);
-    setDeleting(false);
-    if(ok){setDeleteModal(null);setDeleteReason("");}
-    else setMsg("Failed to delete.");
-  };
-
-  const addPortalLog=async(type,action,detail)=>{
-    try{
-      const fresh=await supa.get("store_data",{store_id:session?.storeId});
-      const existing=fresh?.logs||data?.logs||[];
-      const entry={id:"log-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,6),type,action,detail,actor:store?.owner_name||"Owner",actorRole:"role_owner",device:"portal",ts:new Date().toISOString(),dateKey:toLocalDateKey(new Date())};
-      const SIX_MONTHS_AGO=new Date(Date.now()-180*24*60*60*1000).toISOString();
-      const updated=[entry,...existing.filter(l=>l.ts>SIX_MONTHS_AGO)].slice(0,5000);
-      await saveField("logs",updated);
-    }catch(e){}
-  };
-
-  const openAction=(product,action)=>{setUpdateModal({product,action});setActionVal(action==="category"?product.category:"");setActionVal2("");};
-
-  const doAction=async()=>{
-    const {product,action}=updateModal;
-    setActionLoading(true);
-    let updated;let logDetail="";
-    const fmtP=(n)=>`₱${Number(n||0).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-    if(action==="rename"){if(!actionVal.trim()){setActionLoading(false);return;}updated=products.map(p=>p.id===product.id?{...p,name:actionVal.trim()}:p);logDetail=`Renamed: "${product.name}" → "${actionVal.trim()}"`;
-    }else if(action==="category"){updated=products.map(p=>p.id===product.id?{...p,category:actionVal}:p);logDetail=`Category changed: ${product.name} — "${product.category}" → "${actionVal}"`;
-    }else if(action==="price"){const newPrice=parseFloat(actionVal);if(!newPrice||newPrice<=0){setActionLoading(false);return;}updated=products.map(p=>p.id===product.id?{...p,price:newPrice}:p);logDetail=`Price adjusted: ${product.name} — ${fmtP(product.price)} → ${fmtP(newPrice)}`;
-    }else if(action==="add_stock"){const qty=parseInt(actionVal)||0;if(qty<=0){setActionLoading(false);return;}updated=products.map(p=>p.id===product.id?{...p,stock:p.stock+qty}:p);logDetail=`Stock added: ${product.name} +${qty} (${product.stock} → ${product.stock+qty})${actionVal2?` — Note: ${actionVal2}`:""}`;
-    }else if(action==="remove_stock"){const qty=parseInt(actionVal)||0;if(qty<=0||!actionVal2.trim()){setActionLoading(false);return;}const newStock=Math.max(0,product.stock-qty);updated=products.map(p=>p.id===product.id?{...p,stock:newStock}:p);logDetail=`Stock removed: ${product.name} -${qty} (${product.stock} → ${newStock}) — Reason: ${actionVal2}`;
-    }else if(action==="sku"){if(!actionVal.trim()){setActionLoading(false);return;}updated=products.map(p=>p.id===product.id?{...p,sku:actionVal.trim().toUpperCase()}:p);logDetail=`SKU updated: ${product.name} — "${product.sku}" → "${actionVal.trim().toUpperCase()}"`;
-    }else if(action==="status"){const newStatus=!product.active;updated=products.map(p=>p.id===product.id?{...p,active:newStatus}:p);logDetail=`Status changed: ${product.name} — ${product.active?"Active → Inactive":"Inactive → Active"}`;
-    }else if(action==="showInPOS"){const newVal=product.showInPOS===false?true:false;updated=products.map(p=>p.id===product.id?{...p,showInPOS:newVal}:p);logDetail=`POS visibility: ${product.name} — ${newVal?"Now visible in POS":"Now hidden from POS"}`;
-    }else if(action==="stockMode"){if(!product.recipe?.length){setActionLoading(false);return;}const newMode=product.stockMode==="auto"?"manual":"auto";updated=products.map(p=>p.id===product.id?{...p,stockMode:newMode}:p);logDetail=`Stock mode: ${product.name} → ${newMode}`;
-    }else if(action==="image"){const newImg=actionVal==="__remove__"?"":actionVal;updated=products.map(p=>p.id===product.id?{...p,image:newImg}:p);logDetail=newImg?`Image updated: ${product.name}`:`Image removed: ${product.name}`;
-    }else if(action==="delete"){updated=products.filter(p=>p.id!==product.id);logDetail=`Product deleted: "${product.name}" (SKU: ${product.sku||"—"})${actionVal2.trim()?` — Reason: ${actionVal2.trim()}`:""}`;
-    }
-    const ok=await saveField("products",updated);
-    if(ok&&logDetail)await addPortalLog("INVENTORY",action,logDetail);
-    setActionLoading(false);setUpdateModal(null);setActionVal("");setActionVal2("");
-  };
-
-  const handleImg=async(e)=>{
-    const f=e.target.files[0];if(!f)return;
-    const compressed=await compressImage(f);
-    const sess=getSession();
-    const storeId=sess?.storeId||"";
-    const productId=form.id||("p"+Math.random().toString(36).slice(2,10));
-    const url=storeId?await supa.uploadImage(storeId,productId,compressed):null;
-    setForm(x=>({...x,image:url||compressed}));
-  };
-
-  // ── CSV EXPORT ──
-  const exportCSV=()=>{
-    const headers=["name","category","price","stock","sku","active"];
-    const rows=products.map(p=>[`"${(p.name||"").replace(/"/g,'""')}"`,,`"${(p.category||"").replace(/"/g,'""')}"`,,p.price||0,p.stock||0,`"${(p.sku||"").replace(/"/g,'""')}"`,p.active===false?"false":"true"].join(","));
-    const csv=[headers.join(","),...rows].join("\n");
-    const blob=new Blob([csv],{type:"text/csv"});
-    const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`inventory-${new Date().toISOString().slice(0,10)}.csv`;a.click();URL.revokeObjectURL(url);
-  };
-
-  // ── CSV IMPORT ──
-  const handleCSVFile=(e)=>{
-    const file=e.target.files[0];if(!file)return;
-    const reader=new FileReader();
-    reader.onload=(ev)=>{
-      const text=ev.target.result;
-      const lines=text.split("\n").map(l=>l.trim()).filter(Boolean);
-      if(lines.length<2){alert("CSV is empty");return;}
-      const headers=lines[0].toLowerCase().split(",").map(h=>h.trim().replace(/"/g,""));
-      const nameIdx=headers.indexOf("name"),catIdx=headers.indexOf("category"),priceIdx=headers.indexOf("price"),stockIdx=headers.indexOf("stock"),skuIdx=headers.indexOf("sku"),activeIdx=headers.indexOf("active");
-      if(nameIdx===-1||priceIdx===-1){alert("CSV must have name and price columns");return;}
-      const rows=[];const errors=[];
-      lines.slice(1).forEach((line,i)=>{
-        const cols=line.match(/(".*?"|[^,]+)(?=,|$)/g)||line.split(",");
-        const clean=cols.map(c=>c.trim().replace(/^"|"$/g,"").replace(/""/g,'"'));
-        const name=clean[nameIdx]?.trim()||"";const price=parseFloat(clean[priceIdx])||0;
-        if(!name){errors.push(`Row ${i+2}: missing name`);return;}
-        if(price<=0){errors.push(`Row ${i+2}: invalid price`);return;}
-        rows.push({name,category:catIdx!==-1?clean[catIdx]||categories[0]||"Others":categories[0]||"Others",price,stock:stockIdx!==-1?parseInt(clean[stockIdx])||0:0,sku:skuIdx!==-1?clean[skuIdx]||"":"",active:activeIdx!==-1?clean[activeIdx]?.toLowerCase()!=="false":true,_action:"?",_matchId:null});
-      });
-      rows.forEach(r=>{const bysku=r.sku&&products.find(p=>p.sku===r.sku);const byname=!bysku&&products.find(p=>p.name.toLowerCase()===r.name.toLowerCase());r._action=bysku||byname?"update":"create";r._matchId=bysku?.id||byname?.id||null;});
-      setImportRows(rows);setImportErrors(errors);setImportModal(true);e.target.value="";
-    };
-    reader.readAsText(file);
-  };
-
-  const doImport=async()=>{
-    setImporting(true);
-    let nextCounter=skuSettings.counter||0;const newCats=[...categories];const updated=[...products];
-    importRows.forEach(r=>{
-      if(r.category&&!newCats.includes(r.category))newCats.push(r.category);
-      if(!r.sku){nextCounter++;r.sku=`${(skuSettings.prefix||"SW").toUpperCase()}${String(nextCounter).padStart(5,"0")}${(skuSettings.suffix||"").toUpperCase()}`;}
-      if(r._action==="update"&&r._matchId){const idx=updated.findIndex(p=>p.id===r._matchId);if(idx!==-1)updated[idx]={...updated[idx],name:r.name,category:r.category,price:r.price,stock:r.stock,sku:r.sku,active:r.active};}
-      else updated.push({id:"p"+uid(),name:r.name,category:r.category,price:r.price,stock:r.stock,sku:r.sku,active:r.active,image:""});
-    });
-    await saveField("products",updated);
-    if(newCats.length>categories.length)await saveField("categories",newCats);
-    await saveField("sku_settings",{...skuSettings,counter:nextCounter});
-    setImporting(false);setImportModal(false);setImportRows([]);setImportErrors([]);
-  };
-
-  const filtered=products.filter(p=>(catFilter==="All"||p.category===catFilter)&&(p.name.toLowerCase().includes(search.toLowerCase())||p.sku?.includes(search)));
-  const fmt=(n)=>`₱${Number(n||0).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-
   return(
     <div>
       {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
         <div style={{fontWeight:800,fontSize:18}}>Inventory <span style={{fontSize:13,fontWeight:600,color:"#9ca3af"}}>({products.filter(p=>p.active).length} active / {products.length} total)</span></div>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name or SKU…" style={{...INP,width:180,padding:"7px 12px"}}/>
-          <button onClick={exportCSV} style={{padding:"7px 10px",border:"1px solid #e5e7eb",borderRadius:8,cursor:"pointer",fontSize:12,background:"#f9fafb",display:"flex",alignItems:"center",gap:4}}><i className="ti ti-download"/>Export</button>
-          <button onClick={()=>csvRef.current.click()} style={{padding:"7px 10px",border:`1px solid ${primary||"#4f46e5"}`,borderRadius:8,cursor:"pointer",fontSize:12,background:"#f5f3ff",color:primary||"#4f46e5",fontWeight:700,display:"flex",alignItems:"center",gap:4}}><i className="ti ti-upload"/>Import</button>
-          <input ref={csvRef} type="file" accept=".csv" onChange={handleCSVFile} style={{display:"none"}}/>
-          <button onClick={openAdd} style={{padding:"7px 14px",background:primary||"#4f46e5",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:5}}><i className="ti ti-plus"/>Add Product</button>
-        </div>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name or SKU…" style={{...INP,width:220,padding:"7px 12px"}}/>
       </div>
 
       {/* Category filters */}
@@ -1112,7 +965,7 @@ function Inventory({store,data,session,saveField,primary}){
         <table style={{width:"100%",minWidth:580,borderCollapse:"collapse",fontSize:13}}>
           <thead>
             <tr style={{background:"#f9fafb"}}>
-              {["Product","Category","Price","Stock","SKU","Status",""].map(h=>(
+              {["Product","Category","Price","Stock","SKU","Status"].map(h=>(
                 <th key={h} style={{padding:"9px 12px",textAlign:"left",fontWeight:700,fontSize:11,color:"#6b7280",borderBottom:"1px solid #e5e7eb"}}>{h}</th>
               ))}
             </tr>
@@ -1146,68 +999,15 @@ function Inventory({store,data,session,saveField,primary}){
                 <td style={{padding:"10px 12px"}}>
                   <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10,background:p.active?"#f0fdf4":"#fef2f2",color:p.active?"#166534":"#991b1b"}}>{p.active?"Active":"Inactive"}</span>
                 </td>
-                <td style={{padding:"10px 12px"}}>
-                  <div style={{display:"flex",gap:5}}>
-                    <button onClick={()=>openAction(p,"menu")} style={{padding:"4px 10px",background:primary||"#4f46e5",color:"#fff",border:"none",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:700,display:"flex",alignItems:"center",gap:4}}><i className="ti ti-dots" style={{fontSize:12}}/>Update</button>
-                    <button onClick={()=>{setDeleteModal(p);setDeleteReason("");}} style={{padding:"4px 8px",background:"#fef2f2",color:"#dc2626",border:"1px solid #fecaca",borderRadius:6,cursor:"pointer",fontSize:11}}><i className="ti ti-trash" style={{fontSize:12}}/></button>
-                  </div>
-                </td>
+
               </tr>
             ))}
-            {filtered.length===0&&<tr><td colSpan={7} style={{padding:"40px",textAlign:"center",color:"#9ca3af"}}>No products found</td></tr>}
+            {filtered.length===0&&<tr><td colSpan={6} style={{padding:"40px",textAlign:"center",color:"#9ca3af"}}>No products found</td></tr>}
           </tbody>
         </table>
         </div>
       </Card>
 
-      {/* CSV Import Modal */}
-      {importModal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-          <div style={{background:"#fff",borderRadius:16,padding:24,width:"100%",maxWidth:560,maxHeight:"85vh",overflow:"auto"}}>
-            <div style={{fontWeight:800,fontSize:16,marginBottom:4}}>Import Preview — {importRows.length} rows</div>
-            {importErrors.length>0&&<div style={{background:"#fef3c7",border:"1px solid #fde68a",borderRadius:8,padding:"8px 12px",marginBottom:12,fontSize:12,color:"#92400e"}}>{importErrors.length} rows skipped: {importErrors.join(", ")}</div>}
-            <div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:8,padding:"8px 12px",marginBottom:12,display:"flex",gap:16,fontSize:13}}>
-              <span><b>{importRows.filter(r=>r._action==="create").length}</b> will be created</span>
-              <span><b>{importRows.filter(r=>r._action==="update").length}</b> will be updated</span>
-            </div>
-            <div style={{maxHeight:240,overflowY:"auto",marginBottom:14}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                <thead><tr style={{background:"#f9fafb"}}>{["Action","Name","Category","Price","Stock"].map(h=><th key={h} style={{padding:"6px 8px",textAlign:"left",fontWeight:700,fontSize:10,color:"#6b7280",borderBottom:"1px solid #e5e7eb"}}>{h}</th>)}</tr></thead>
-                <tbody>{importRows.map((r,i)=><tr key={i} style={{borderBottom:"0.5px solid #f3f4f6"}}>
-                  <td style={{padding:"6px 8px"}}><span style={{fontSize:10,fontWeight:700,padding:"2px 6px",borderRadius:8,background:r._action==="create"?"#f0fdf4":"#dbeafe",color:r._action==="create"?"#166534":"#1e40af"}}>{r._action}</span></td>
-                  <td style={{padding:"6px 8px",fontWeight:600}}>{r.name}</td>
-                  <td style={{padding:"6px 8px",color:"#6b7280"}}>{r.category}</td>
-                  <td style={{padding:"6px 8px"}}>₱{r.price}</td>
-                  <td style={{padding:"6px 8px"}}>{r.stock}</td>
-                </tr>)}</tbody>
-              </table>
-            </div>
-            <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>{setImportModal(false);setImportRows([]);}} style={{flex:1,padding:"10px 0",border:"1px solid #e5e7eb",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700}}>Cancel</button>
-              <button onClick={doImport} disabled={importing} style={{flex:2,padding:"10px 0",background:importing?"#a5b4fc":(primary||"#4f46e5"),color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:800}}>{importing?"Importing…":`Confirm (${importRows.length} rows)`}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {deleteModal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-          <div style={{background:"#fff",borderRadius:16,padding:24,width:"100%",maxWidth:400}}>
-            <div style={{fontWeight:800,fontSize:16,marginBottom:4,color:"#dc2626"}}>Delete Product</div>
-            <div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,padding:"10px 14px",marginBottom:14,fontSize:13,color:"#991b1b"}}>
-              Are you sure you want to delete <b>{deleteModal.name}</b>? This cannot be undone.
-            </div>
-            <FRow label="Reason" hint="optional">
-              <input value={deleteReason} onChange={e=>setDeleteReason(e.target.value)} placeholder="e.g. Discontinued, Duplicate…" style={INP} autoFocus/>
-            </FRow>
-            <div style={{display:"flex",gap:8,marginTop:14}}>
-              <button onClick={()=>setDeleteModal(null)} style={{flex:1,padding:"10px 0",border:"1px solid #e5e7eb",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700}}>Cancel</button>
-              <button onClick={doDelete} disabled={deleting} style={{flex:1,padding:"10px 0",background:deleting?"#fca5a5":"#dc2626",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:800}}>{deleting?"Deleting…":"Delete"}</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Add / Edit Modal */}
       {modal&&(
@@ -1552,241 +1352,78 @@ function Accounts({store,data,session,saveField}){
   );
 }
 // ════════════ SETTINGS ════════════
-function Settings({store,data,session,saveField,onRefresh,setStore}){
+function Settings({store,data,session,onRefresh}){
   const [sTab,setSTab]=useState("appearance");
   const theme=data?.theme||{};
   const orderSettings=data?.order_settings||{};
   const skuSettings=data?.sku_settings||{};
-  const [themeForm,setThemeForm]=useState({
-    storeName:  theme.storeName||store?.store_name||"My Store",
-    primary:    theme.primary||"#4f46e5",
-    sidebar:    theme.sidebar||"#1a1a2e",
-    bgColor:    theme.bgColor||"#f0f0f8",
-    logoText:   theme.logoText||"POS",
-    fontFamily: theme.fontFamily||"sans-serif",
-    borderRadius:theme.borderRadius||"10",
-  });
-  const [osForm,setOsForm]=useState({
-    vatEnabled:  orderSettings.vatEnabled||false,
-    vatPercent:  orderSettings.vatPercent||12,
-    orderTypes:  (()=>{
-      const types = orderSettings.orderTypes||[];
-      const BUILT_INS=[{id:"ot1",label:"Dine-in",enabled:false,locked:true},{id:"ot2",label:"Take-out",enabled:false,locked:true}];
-      const hasOt1=types.some(t=>t.id==="ot1"), hasOt2=types.some(t=>t.id==="ot2");
-      const merged = !hasOt1||!hasOt2
-        ? [...BUILT_INS.filter(bi=>!types.some(t=>t.id===bi.id)),...types.map(t=>(t.id==="ot1"||t.id==="ot2")?{...t,locked:true}:t)]
-        : types.map(t=>(t.id==="ot1"||t.id==="ot2")?{...t,locked:true}:t);
-      return merged;
-    })(),
-    orderSources:orderSettings.orderSources||[],
-    orderNumPrefix: orderSettings.orderNumPrefix||"ORD",
-    orderNumFormat: orderSettings.orderNumFormat||"prefix-datetime",
-  });
-  const [skuForm,setSkuForm]=useState({
-    prefix: skuSettings.prefix||"SW",
-    suffix: skuSettings.suffix||"",
-    counter:skuSettings.counter||0,
-  });
-  const [saving,setSaving]=useState(false);
-  const [saved,setSaved]=useState("");
-  const [err,setErr]=useState("");
-
-  const saveTheme=async()=>{
-    setSaving(true);setErr("");
-    const newTheme={...theme,...themeForm};
-    const ok=await saveField("theme",newTheme);
-    // Also update store name in stores table
-    if(themeForm.storeName!==store?.store_name){
-      await supa.update("stores",{id:session.storeId},{store_name:themeForm.storeName});
-      setStore(s=>({...s,store_name:themeForm.storeName}));
-    }
-    setSaving(false);
-    if(ok){setSaved("appearance");setTimeout(()=>setSaved(""),2000);}else setErr("Failed to save. Check connection.");
-  };
-
-  const saveOrderSettings=async()=>{
-    setSaving(true);setErr("");
-    const ok=await saveField("order_settings",osForm);
-    setSaving(false);
-    if(ok){setSaved("orders");setTimeout(()=>setSaved(""),2000);}else setErr("Failed to save.");
-  };
-
-  const saveSku=async()=>{
-    const p=skuForm.prefix.trim().toUpperCase();
-    const s=skuForm.suffix.trim().toUpperCase();
-    if(!p||p.length<2||p.length>5){setErr("Prefix must be 2–5 characters");return;}
-    if(s&&(s.length<2||s.length>5)){setErr("Suffix must be 2–5 chars or empty");return;}
-    setSaving(true);setErr("");
-    const ok=await saveField("sku_settings",{...skuForm,prefix:p,suffix:s});
-    setSaving(false);
-    if(ok){setSaved("sku");setTimeout(()=>setSaved(""),2000);}else setErr("Failed to save.");
-  };
-
-  const addOrderType=()=>setOsForm(f=>({...f,orderTypes:[...f.orderTypes,{id:"ot"+uid(),label:"",enabled:true}]}));
-  const updOrderType=(id,field,val)=>setOsForm(f=>({...f,orderTypes:f.orderTypes.map(t=>t.id===id?{...t,[field]:val}:t)}));
-  const delOrderType=(id)=>setOsForm(f=>({...f,orderTypes:f.orderTypes.filter(t=>t.id!==id)}));
-  const addOrderSource=()=>setOsForm(f=>({...f,orderSources:[...f.orderSources,{id:"os"+uid(),label:"",enabled:true}]}));
-  const updOrderSource=(id,field,val)=>setOsForm(f=>({...f,orderSources:f.orderSources.map(s=>s.id===id?{...s,[field]:val}:s)}));
-  const delOrderSource=(id)=>setOsForm(f=>({...f,orderSources:f.orderSources.filter(s=>s.id!==id)}));
-
-  const FONTS=["sans-serif","Arial","Georgia","Courier New","Trebuchet MS","Verdana"];
   const TABS=[{k:"appearance",l:"Appearance"},{k:"orders",l:"Order Settings"},{k:"sku",l:"SKU"},{k:"devices",l:"Devices"}];
-  const rBg=parseInt(themeForm.borderRadius);
-
+  const RO={fontSize:13,color:"#374151",padding:"8px 12px",background:"#f9fafb",border:"1px solid #e5e7eb",borderRadius:8};
+  const LBL2={fontSize:11,fontWeight:700,color:"#6b7280",marginBottom:4,display:"block"};
   return(
     <div>
-      <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
-        {TABS.map(t=><button key={t.k} onClick={()=>{setSTab(t.k);setErr("");}} style={{padding:"6px 16px",borderRadius:8,border:"1px solid",cursor:"pointer",fontSize:13,fontWeight:700,borderColor:sTab===t.k?"#4f46e5":"#e5e7eb",background:sTab===t.k?"#4f46e5":"#fff",color:sTab===t.k?"#fff":"#6b7280"}}>{t.l}</button>)}
+      <div style={{display:"flex",gap:6,marginBottom:20,flexWrap:"wrap"}}>
+        {TABS.map(t=><button key={t.k} onClick={()=>setSTab(t.k)} style={{padding:"6px 16px",borderRadius:8,border:"1px solid",cursor:"pointer",fontSize:13,fontWeight:700,borderColor:sTab===t.k?"#4f46e5":"#e5e7eb",background:sTab===t.k?"#4f46e5":"#fff",color:sTab===t.k?"#fff":"#6b7280"}}>{t.l}</button>)}
       </div>
-
-      {/* ── APPEARANCE ── */}
+      <div style={{fontSize:11,color:"#9ca3af",marginBottom:16,padding:"8px 12px",background:"#f9fafb",borderRadius:8,border:"1px solid #e5e7eb"}}>
+        <i className="ti ti-lock" style={{marginRight:6}}/>Settings are read-only in the portal. To change settings, open the POS app on your device.
+      </div>
       {sTab==="appearance"&&(
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:14}}>
-          <Card style={{gridColumn:"1/-1"}}>
-            <SectionTitle>Branding</SectionTitle>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:12}}>
-              <FRow label="Store Name"><input value={themeForm.storeName} onChange={e=>setThemeForm(f=>({...f,storeName:e.target.value}))} style={INP}/></FRow>
-              <FRow label="Logo Initials"><input value={themeForm.logoText} onChange={e=>setThemeForm(f=>({...f,logoText:e.target.value}))} maxLength={4} style={INP}/></FRow>
-              <FRow label="Font"><select value={themeForm.fontFamily} onChange={e=>setThemeForm(f=>({...f,fontFamily:e.target.value}))} style={INP}>{FONTS.map(ff=><option key={ff} value={ff}>{ff}</option>)}</select></FRow>
-            </div>
-            <div>
-              <label style={LBL}>Corner Radius: {themeForm.borderRadius}px</label>
-              <input type="range" min={0} max={24} step={1} value={themeForm.borderRadius} onChange={e=>setThemeForm(f=>({...f,borderRadius:e.target.value}))} style={{width:"100%",marginTop:6}}/>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#9ca3af"}}><span>Sharp</span><span>Rounded</span></div>
-            </div>
-          </Card>
-          <Card>
-            <SectionTitle>Colors</SectionTitle>
-            {[{k:"primary",l:"Primary Color"},{k:"sidebar",l:"Sidebar Background"},{k:"bgColor",l:"Page Background"}].map(({k,l})=>(
-              <div key={k} style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-                <input type="color" value={themeForm[k]} onChange={e=>setThemeForm(f=>({...f,[k]:e.target.value}))} style={{width:40,height:40,border:"none",borderRadius:8,cursor:"pointer",padding:2}}/>
-                <div><div style={{fontSize:12,fontWeight:700}}>{l}</div><div style={{fontSize:11,color:"#9ca3af",fontFamily:"monospace"}}>{themeForm[k]}</div></div>
-              </div>
-            ))}
-          </Card>
-          {/* Live preview */}
-          <Card style={{background:themeForm.bgColor,fontFamily:themeForm.fontFamily+",sans-serif"}}>
-            <div style={{fontSize:11,fontWeight:800,color:"#6b7280",textTransform:"uppercase",letterSpacing:0.5,marginBottom:12}}>Live Preview</div>
-            <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",marginBottom:12}}>
-              <div style={{width:42,height:42,borderRadius:rBg+4+"px",background:themeForm.primary,display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:"#fff",fontWeight:800,fontSize:14}}>{(themeForm.logoText||"P").slice(0,2).toUpperCase()}</span></div>
-              <button style={{padding:"8px 16px",background:themeForm.primary,color:"#fff",border:"none",borderRadius:rBg+"px",cursor:"pointer",fontWeight:800,fontFamily:themeForm.fontFamily+",sans-serif",fontSize:13}}>Charge ₱120.00</button>
-              <div style={{padding:"6px 12px",background:"#fff",border:`2px solid ${themeForm.primary}`,borderRadius:rBg+"px",fontSize:13,fontWeight:700,color:themeForm.primary}}>{themeForm.storeName}</div>
-            </div>
-            <div style={{padding:10,background:themeForm.sidebar,borderRadius:rBg+"px",display:"flex",gap:6}}>
-              {["ti-shopping-cart","ti-receipt","ti-box","ti-chart-bar","ti-settings"].map(ic=>(
-                <div key={ic} style={{width:36,height:36,borderRadius:7,background:"rgba(255,255,255,0.08)",display:"flex",alignItems:"center",justifyContent:"center"}}><i className={`ti ${ic}`} style={{fontSize:16,color:"rgba(255,255,255,0.5)"}}/></div>
-              ))}
-            </div>
-          </Card>
-          {err&&<div style={{gridColumn:"1/-1"}}><Err msg={err}/></div>}
-          <div style={{gridColumn:"1/-1"}}>
-            <button onClick={saveTheme} disabled={saving} style={{padding:"12px 32px",background:saving?"#a5b4fc":"#4f46e5",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontSize:14,fontWeight:800,display:"flex",alignItems:"center",gap:8}}>
-              {saving?<><i className="ti ti-loader-2"/>Saving…</>:saved==="appearance"?<><i className="ti ti-check"/>Saved!</>:<><i className="ti ti-device-floppy"/>Apply & Save</>}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── ORDER SETTINGS ── */}
-      {sTab==="orders"&&(
-        <div style={{display:"flex",flexDirection:"column",gap:14}}>
-          <Card>
-            <SectionTitle>VAT / Tax</SectionTitle>
-            <div style={{marginBottom:12}}><Toggle checked={osForm.vatEnabled} onChange={v=>setOsForm(f=>({...f,vatEnabled:v}))} label="Enable VAT by default on new orders"/></div>
-            <FRow label="VAT Percentage (%)"><input type="number" value={osForm.vatPercent} onChange={e=>setOsForm(f=>({...f,vatPercent:parseFloat(e.target.value)||0}))} min={0} max={100} style={{...INP,maxWidth:120}}/></FRow>
-          </Card>
-          <Card>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-              <div><SectionTitle>Order Types</SectionTitle><div style={{fontSize:11,color:"#9ca3af",marginTop:-10,marginBottom:8}}>Shown above discount section in cart</div></div>
-              <button onClick={addOrderType} style={{padding:"5px 12px",background:"#4f46e5",color:"#fff",border:"none",borderRadius:7,cursor:"pointer",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:4}}><i className="ti ti-plus"/>Add</button>
-            </div>
-            {osForm.orderTypes.filter(t=>!t.locked).length===0&&osForm.orderTypes.filter(t=>t.locked).length===0&&<div style={{fontSize:12,color:"#9ca3af"}}>No order types yet. Add one above.</div>}
-            {osForm.orderTypes.map(t=>(
-              t.locked ? (
-                <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,padding:"9px 12px",background:"#f9fafb",borderRadius:8,border:"1px solid #e5e7eb"}}>
-                  <Toggle checked={t.enabled||false} onChange={v=>updOrderType(t.id,"enabled",v)} label=""/>
-                  <span style={{flex:1,fontSize:13,fontWeight:700,color:"#374151"}}>{t.label}</span>
-                  <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:8,background:"#fef3c7",color:"#92400e"}}>Built-in</span>
-                </div>
-              ) : (
-                <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,padding:"7px 10px",background:"#f9fafb",borderRadius:8}}>
-                  <input type="checkbox" checked={t.enabled} onChange={e=>updOrderType(t.id,"enabled",e.target.checked)} style={{width:16,height:16,accentColor:"#4f46e5",cursor:"pointer",flexShrink:0}}/>
-                  <input value={t.label} onChange={e=>updOrderType(t.id,"label",e.target.value)} placeholder="e.g. Delivery" style={{...INP,flex:1,padding:"6px 10px"}}/>
-                  <button onClick={()=>delOrderType(t.id)} style={{background:"none",border:"1px solid #fecaca",borderRadius:6,padding:"5px 7px",cursor:"pointer",color:"#ef4444",flexShrink:0}}><i className="ti ti-trash" style={{fontSize:13}}/></button>
-                </div>
-              )
-            ))}
-          </Card>
-          <Card>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-              <div><SectionTitle>Order Sources</SectionTitle><div style={{fontSize:11,color:"#9ca3af",marginTop:-10,marginBottom:8}}>Shown in the payment screen</div></div>
-              <button onClick={addOrderSource} style={{padding:"5px 12px",background:"#4f46e5",color:"#fff",border:"none",borderRadius:7,cursor:"pointer",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:4}}><i className="ti ti-plus"/>Add</button>
-            </div>
-            {osForm.orderSources.length===0&&<div style={{fontSize:12,color:"#9ca3af"}}>No order sources yet. Add one above.</div>}
-            {osForm.orderSources.map(s=>(
-              <div key={s.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,padding:"7px 10px",background:"#f9fafb",borderRadius:8}}>
-                <input type="checkbox" checked={s.enabled} onChange={e=>updOrderSource(s.id,"enabled",e.target.checked)} style={{width:16,height:16,accentColor:"#4f46e5",cursor:"pointer",flexShrink:0}}/>
-                <input value={s.label} onChange={e=>updOrderSource(s.id,"label",e.target.value)} placeholder="e.g. Walk-in" style={{...INP,flex:1,padding:"6px 10px"}}/>
-                <button onClick={()=>delOrderSource(s.id)} style={{background:"none",border:"1px solid #fecaca",borderRadius:6,padding:"5px 7px",cursor:"pointer",color:"#ef4444",flexShrink:0}}><i className="ti ti-trash" style={{fontSize:13}}/></button>
-              </div>
-            ))}
-          </Card>
-          <Card>
-            <SectionTitle>Order Number Format</SectionTitle>
-            <FRow label="Prefix" hint="max 8 chars"><input value={osForm.orderNumPrefix} onChange={e=>setOsForm(f=>({...f,orderNumPrefix:e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,8)}))} placeholder="ORD" style={{...INP,maxWidth:160,fontFamily:"monospace",fontWeight:700}}/></FRow>
-            <div style={{marginTop:12}}>
-              <label style={LBL}>Format</label>
-              <div style={{display:"flex",flexDirection:"column",gap:7,marginTop:7}}>
-                {[
-                  {val:"prefix-datetime",  ex:`${osForm.orderNumPrefix}20260613032943`, desc:"Prefix + Date & Time (unique per second)"},
-                  {val:"prefix-seq",       ex:`${osForm.orderNumPrefix}00001`,          desc:"Prefix + Sequential Number"},
-                  {val:"prefix-date-seq",  ex:`${osForm.orderNumPrefix}20260613-0001`,  desc:"Prefix + Date + Daily Sequence"},
-                ].map(f=>(
-                  <label key={f.val} onClick={()=>setOsForm(x=>({...x,orderNumFormat:f.val}))} style={{display:"flex",alignItems:"flex-start",gap:9,cursor:"pointer",padding:"9px 12px",borderRadius:8,background:(osForm.orderNumFormat||"prefix-datetime")===f.val?"#f5f3ff":"#f9fafb",border:`1.5px solid ${(osForm.orderNumFormat||"prefix-datetime")===f.val?"#4f46e5":"#e5e7eb"}`}}>
-                    <div style={{width:14,height:14,borderRadius:"50%",border:`2px solid ${(osForm.orderNumFormat||"prefix-datetime")===f.val?"#4f46e5":"#d1d5db"}`,background:(osForm.orderNumFormat||"prefix-datetime")===f.val?"#4f46e5":"#fff",flexShrink:0,marginTop:2,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      {(osForm.orderNumFormat||"prefix-datetime")===f.val&&<div style={{width:5,height:5,borderRadius:"50%",background:"#fff"}}/>}
-                    </div>
-                    <div><div style={{fontWeight:700,fontSize:12,color:(osForm.orderNumFormat||"prefix-datetime")===f.val?"#4f46e5":"#374151"}}>{f.desc}</div><div style={{fontFamily:"monospace",fontSize:12,fontWeight:800,color:(osForm.orderNumFormat||"prefix-datetime")===f.val?"#4f46e5":"#6b7280",marginTop:3}}>{f.ex}</div></div>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </Card>
-          {err&&<Err msg={err}/>}
-          <button onClick={saveOrderSettings} disabled={saving} style={{padding:"12px 32px",background:saving?"#a5b4fc":"#4f46e5",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontSize:14,fontWeight:800,display:"flex",alignItems:"center",gap:8,width:"fit-content"}}>
-            {saving?<><i className="ti ti-loader-2"/>Saving…</>:saved==="orders"?<><i className="ti ti-check"/>Saved!</>:<><i className="ti ti-device-floppy"/>Save Order Settings</>}
-          </button>
-        </div>
-      )}
-
-      {/* ── SKU ── */}
-      {sTab==="sku"&&(
         <Card>
-          <SectionTitle>SKU / Product Code Format</SectionTitle>
-          <div style={{fontSize:12,color:"#9ca3af",marginBottom:16}}>Auto-generated when adding products. Format: PREFIX + 5 digits + SUFFIX (optional)</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
-            <FRow label="Prefix" hint="2–5 chars, required"><input value={skuForm.prefix} onChange={e=>setSkuForm(f=>({...f,prefix:e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,5)}))} placeholder="SW" style={INP} maxLength={5}/></FRow>
-            <FRow label="Suffix" hint="2–5 chars, optional"><input value={skuForm.suffix} onChange={e=>setSkuForm(f=>({...f,suffix:e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,5)}))} placeholder="PH" style={INP} maxLength={5}/></FRow>
+          <div style={{fontWeight:800,fontSize:14,marginBottom:14}}>Appearance</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12}}>
+            <div><label style={LBL2}>Store Name</label><div style={RO}>{theme.storeName||store?.store_name||"—"}</div></div>
+            <div><label style={LBL2}>Logo Text</label><div style={RO}>{theme.logoText||"—"}</div></div>
+            <div><label style={LBL2}>Font</label><div style={RO}>{theme.fontFamily||"sans-serif"}</div></div>
+            <div><label style={LBL2}>Border Radius</label><div style={RO}>{theme.borderRadius||"10"}px</div></div>
+            <div><label style={LBL2}>Primary Color</label><div style={{...RO,display:"flex",alignItems:"center",gap:8}}><span style={{width:16,height:16,borderRadius:4,background:theme.primary||"#4f46e5",display:"inline-block",border:"1px solid #e5e7eb"}}/>{theme.primary||"#4f46e5"}</div></div>
+            <div><label style={LBL2}>Sidebar Color</label><div style={{...RO,display:"flex",alignItems:"center",gap:8}}><span style={{width:16,height:16,borderRadius:4,background:theme.sidebar||"#1a1a2e",display:"inline-block",border:"1px solid #e5e7eb"}}/>{theme.sidebar||"#1a1a2e"}</div></div>
           </div>
-          <div style={{background:"#f5f3ff",borderRadius:10,padding:"12px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:10}}>
-            <i className="ti ti-tag" style={{fontSize:18,color:"#4f46e5"}}/>
-            <div><div style={{fontSize:10,fontWeight:800,color:"#5b21b6",textTransform:"uppercase",letterSpacing:0.5,marginBottom:2}}>Next SKU Preview</div><div style={{fontFamily:"monospace",fontWeight:800,fontSize:20,color:"#4f46e5",letterSpacing:2}}>{skuForm.prefix.toUpperCase()}{String(skuForm.counter+1).padStart(5,"0")}{skuForm.suffix.toUpperCase()}</div></div>
-          </div>
-          {err&&<Err msg={err}/>}
-          <button onClick={saveSku} disabled={saving} style={{padding:"11px 24px",background:saving?"#a5b4fc":"#4f46e5",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontSize:14,fontWeight:800,display:"flex",alignItems:"center",gap:8}}>
-            {saving?<><i className="ti ti-loader-2"/>Saving…</>:saved==="sku"?<><i className="ti ti-check"/>Saved!</>:<><i className="ti ti-device-floppy"/>Save SKU Settings</>}
-          </button>
         </Card>
       )}
-
-      {/* ── DEVICES ── */}
-      {sTab==="devices"&&(
-        <DevicesTab store={store} session={session} onRefresh={onRefresh}/>
+      {sTab==="orders"&&(
+        <Card>
+          <div style={{fontWeight:800,fontSize:14,marginBottom:14}}>Order Settings</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12,marginBottom:16}}>
+            <div><label style={LBL2}>VAT</label><div style={RO}>{orderSettings.vatEnabled?`Enabled — ${orderSettings.vatPercent||12}%`:"Disabled"}</div></div>
+            <div><label style={LBL2}>Order Number Prefix</label><div style={RO}>{orderSettings.orderNumPrefix||"ORD"}</div></div>
+            <div><label style={LBL2}>Order Number Format</label><div style={RO}>{orderSettings.orderNumFormat||"prefix-datetime"}</div></div>
+          </div>
+          {(orderSettings.orderTypes||[]).length>0&&(
+            <div style={{marginBottom:12}}>
+              <label style={LBL2}>Order Types</label>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                {orderSettings.orderTypes.map(t=><span key={t.id} style={{fontSize:12,padding:"3px 10px",borderRadius:6,background:t.enabled?"#f0fdf4":"#f3f4f6",color:t.enabled?"#166534":"#6b7280",border:`1px solid ${t.enabled?"#bbf7d0":"#e5e7eb"}`}}>{t.label}{t.enabled?" ✓":""}</span>)}
+              </div>
+            </div>
+          )}
+          {(orderSettings.orderSources||[]).length>0&&(
+            <div>
+              <label style={LBL2}>Order Sources</label>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                {orderSettings.orderSources.map(s=><span key={s.id} style={{fontSize:12,padding:"3px 10px",borderRadius:6,background:"#f0f9ff",color:"#0369a1",border:"1px solid #bae6fd"}}>{s.label}</span>)}
+              </div>
+            </div>
+          )}
+        </Card>
       )}
+      {sTab==="sku"&&(
+        <Card>
+          <div style={{fontWeight:800,fontSize:14,marginBottom:14}}>SKU Settings</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}>
+            <div><label style={LBL2}>Prefix</label><div style={RO}>{skuSettings.prefix||"SW"}</div></div>
+            <div><label style={LBL2}>Suffix</label><div style={RO}>{skuSettings.suffix||"—"}</div></div>
+            <div><label style={LBL2}>Last Counter</label><div style={RO}>{skuSettings.counter||0}</div></div>
+          </div>
+          <div style={{marginTop:12,fontSize:12,color:"#6b7280"}}>
+            Next SKU will be: <b style={{fontFamily:"monospace"}}>{(skuSettings.prefix||"SW").toUpperCase()}{String((skuSettings.counter||0)+1).padStart(5,"0")}{(skuSettings.suffix||"").toUpperCase()}</b>
+          </div>
+        </Card>
+      )}
+      {sTab==="devices"&&<DevicesTab store={store} session={session} onRefresh={onRefresh}/>}
     </div>
   );
 }
-
 function DevicesTab({store,session,onRefresh}){
   const [devices,setDevices]=useState(store?.devices||[]);
   const [otpModal,setOtpModal]=useState(null); // null | {deviceId, deviceName}
