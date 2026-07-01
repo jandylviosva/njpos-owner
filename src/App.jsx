@@ -412,7 +412,7 @@ export default function App(){
 
         {/* Logo */}
         <div style={{display:"flex",alignItems:"center",gap:8,marginRight:4,flexShrink:0}}>
-          <div style={{width:28,height:28,borderRadius:7,overflow:"hidden"}}><img src="/icons/icon-192.png" alt="POS Pro" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:7}}/></div>
+          <div style={{width:28,height:28,borderRadius:7,overflow:"hidden",background:"rgba(255,255,255,0.1)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{theme.logoUrl?<img src={theme.logoUrl} alt="logo" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:7}} onError={e=>{e.target.style.display="none";e.target.nextSibling.style.display="flex";}}/>:<img src="/icons/icon-192.png" alt="POS Pro" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:7}}/>}</div>
           <div>
             <div style={{fontWeight:800,fontSize:11,lineHeight:1}}>{store?.store_name||"POS Pro"}</div>
             <div style={{fontSize:9,color:"rgba(255,255,255,0.4)",marginTop:1}}>Owner Portal</div>
