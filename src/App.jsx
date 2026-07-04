@@ -103,36 +103,40 @@ const clearSession= () => sessionStorage.removeItem(SESSION_KEY);
 // Resend API key is managed exclusively server-side (Vercel env: RESEND_API_KEY).
 // It is never stored or read client-side to prevent key exposure.
 
+// SECURITY: OTP generation, storage, and verification happen entirely on
+// the server (/api/send-otp) using the Supabase SERVICE key. The browser
+// never generates the code, never writes it to Supabase directly, and
+// never reads it back — it only ever sees {ok:true}/{ok:false}. This
+// replaces an earlier version that PATCHed the OTP into `stores` with the
+// anon key and read it back to compare client-side, which meant the
+// plaintext code was visible in DevTools → Network on every request.
 const sendPortalOTP = async (email, storeName, purpose="sign-in") => {
-  const otp    = String(Math.floor(100000+Math.random()*900000));
-  const expiry = new Date(Date.now()+10*60*1000).toISOString();
-  // Store OTP in Supabase
-  await supa.update("stores",{owner_email:email.toLowerCase()},{otp_code:otp,otp_expiry:expiry});
-
-  // Call our Vercel serverless function (which calls Resend server-side)
   try {
     const r = await fetch("/api/send-otp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, otp, storeName, purpose }),
+      body: JSON.stringify({ action:"send-otp", email, storeName, purpose }),
     });
-    if(r.ok) return {ok:true};
-    // If serverless function not available, log to console (dev mode)
-    console.log(`[DEV] OTP for ${email}: ${otp}`);
-    return {ok:true, dev:true, otp};
+    const data = await r.json().catch(()=>({}));
+    if(r.ok && data.ok) return {ok:true};
+    return {ok:false, error:data.error||"Failed to send code"};
   } catch {
-    // Fallback for local development
-    console.log(`[DEV] OTP for ${email}: ${otp}`);
-    return {ok:true, dev:true, otp};
+    return {ok:false, error:"Network error"};
   }
 };
 
 const verifyPortalOTP = async (email, inputOtp) => {
-  const store = await supa.get("stores",{owner_email:email.toLowerCase()});
-  if(!store||store.otp_code!==inputOtp) return false;
-  if(new Date()>new Date(store.otp_expiry)) return false;
-  await supa.update("stores",{owner_email:email.toLowerCase()},{otp_code:null,otp_expiry:null});
-  return true;
+  try {
+    const r = await fetch("/api/send-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action:"verify-otp", email, otp:inputOtp }),
+    });
+    const data = await r.json().catch(()=>({}));
+    return !!(r.ok && data.ok);
+  } catch {
+    return false;
+  }
 };
 
 // ════════════════════════════════════════════════════════
