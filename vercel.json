@@ -1,7 +1,8 @@
 {
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/payment",  "destination": "/payment.html" },
-    { "source": "/(.*)",     "destination": "/index.html" }
+    { "source": "/api/(.*)",     "destination": "/api/$1" },
+    { "source": "/payment",      "destination": "/payment.html" },
+    { "source": "/bill-payment", "destination": "/bill-payment.html" },
+    { "source": "/(.*)",         "destination": "/index.html" }
   ]
 }
