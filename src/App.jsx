@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Fragment } from "react";
 import bcrypt from "bcryptjs";
 
 // ════════════════════════════════════════════════════════
@@ -725,7 +725,7 @@ function Dashboard({store,data,primary,licenseRow}){
 // ════════════ REPORTS ════════════
 
 // ── PORTAL SHIFTS TAB ──
-function PortalShiftsTab({shifts,filteredShifts,fmt,primary,shiftPeriod,setShiftPeriod,shiftFrom,setShiftFrom,shiftTo,setShiftTo,shiftCashier,setShiftCashier,isOwner,onSaveShifts}){
+function PortalShiftsTab({shifts,filteredShifts,logs=[],fmt,primary,shiftPeriod,setShiftPeriod,shiftFrom,setShiftFrom,shiftTo,setShiftTo,shiftCashier,setShiftCashier,isOwner,onSaveShifts}){
   const cashierList=[...new Set(shifts.map(s=>s.cashier).filter(Boolean))].sort();
   const [editShift,setEditShift]=useState(null);
   const [editActual,setEditActual]=useState("");
@@ -778,6 +778,32 @@ function PortalShiftsTab({shifts,filteredShifts,fmt,primary,shiftPeriod,setShift
                 {s.closedReason==="auto_24h"&&<span style={{fontSize:10,fontWeight:700,padding:"1px 7px",borderRadius:8,background:"#f3f4f6",color:"#6b7280"}}>AUTO-ENDED</span>}
               </div>
               <div style={{fontSize:11,color:"#9ca3af"}}>{s.startTime} → {s.endTime}</div>
+              {(()=>{
+                // Handoffs aren't stored on the shift record itself — the
+                // PWA just relabels the active shift's cashier and writes
+                // one SHIFT/handoff log entry. Cross-referencing logs by
+                // timestamp against this shift's window is the only way
+                // to surface it here, but it's exactly what's needed:
+                // the log's detail text already reads "X → Y" verbatim.
+                const start=new Date(s.startTime).getTime();
+                const end=s.endTime?new Date(s.endTime).getTime():Date.now();
+                if(isNaN(start)) return null;
+                const handoffs=logs.filter(l=>{
+                  if(l.type!=="SHIFT"||l.action!=="handoff") return false;
+                  const t=new Date(l.ts).getTime();
+                  return !isNaN(t)&&t>=start&&t<=end;
+                });
+                if(!handoffs.length) return null;
+                return(
+                  <div style={{marginTop:4,display:"flex",flexDirection:"column",gap:2}}>
+                    {handoffs.map(h=>(
+                      <div key={h.id} style={{fontSize:11,color:"#b45309",display:"flex",alignItems:"center",gap:4}}>
+                        <i className="ti ti-repeat" style={{fontSize:11}}/>{h.detail||"Shift handed off"}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
               {s.status==="partial"&&!s.editLocked&&isOwner&&(
@@ -1006,7 +1032,7 @@ function Reports({store,data,primary,isOwner,saveField}){
         </div>
       </>}
       {tab==="shifts"&&
-              <PortalShiftsTab shifts={shifts} filteredShifts={filteredShifts} fmt={fmt} primary={primary} shiftPeriod={shiftPeriod} setShiftPeriod={setShiftPeriod} shiftFrom={shiftFrom} setShiftFrom={setShiftFrom} shiftTo={shiftTo} setShiftTo={setShiftTo} shiftCashier={shiftCashier} setShiftCashier={setShiftCashier} isOwner={isOwner} onSaveShifts={(updated)=>{
+              <PortalShiftsTab shifts={shifts} filteredShifts={filteredShifts} logs={data?.logs||[]} fmt={fmt} primary={primary} shiftPeriod={shiftPeriod} setShiftPeriod={setShiftPeriod} shiftFrom={shiftFrom} setShiftFrom={setShiftFrom} shiftTo={shiftTo} setShiftTo={setShiftTo} shiftCashier={shiftCashier} setShiftCashier={setShiftCashier} isOwner={isOwner} onSaveShifts={(updated)=>{
                 const allShifts=data?.shifts||[];
                 const newShifts=[updated,...allShifts.filter(s=>s.id!==updated.id)];
                 saveField("shifts",newShifts);
@@ -1033,89 +1059,365 @@ function Reports({store,data,primary,isOwner,saveField}){
 function Inventory({store,data,session,primary}){
   const products=data?.products||[];
   const categories=data?.categories||[];
+  const logs=data?.logs||[];
+  const [tab,setTab]=useState("products");
   const [search,setSearch]=useState("");
   const [catFilter,setCat]=useState("All");
+  const [expanded,setExpanded]=useState({});
+  const toggleExpand=(id)=>setExpanded(e=>({...e,[id]:!e[id]}));
   const filtered=products.filter(p=>
     (catFilter==="All"||p.category===catFilter)&&
     (p.name.toLowerCase().includes(search.toLowerCase())||p.sku?.includes(search))
   );
   const fmt=(n)=>`₱${Number(n||0).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const P=primary||"#4f46e5";
+
   return(
     <div>
       {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
         <div style={{fontWeight:800,fontSize:18}}>Inventory <span style={{fontSize:13,fontWeight:600,color:"#9ca3af"}}>({products.filter(p=>p.active).length} active / {products.length} total)</span></div>
-        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name or SKU…" style={{...INP,width:220,padding:"7px 12px"}}/>
+        {tab==="products"&&<input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name or SKU…" style={{...INP,width:220,padding:"7px 12px"}}/>}
       </div>
 
-      {/* Read-only notice */}
-      <div style={{fontSize:11,color:"#9ca3af",marginBottom:12,padding:"7px 12px",background:"#f9fafb",borderRadius:8,border:"1px solid #e5e7eb",display:"flex",alignItems:"center",gap:6}}>
-        <i className="ti ti-lock" style={{fontSize:12}}/>Inventory is view-only in the portal. Use the POS app to add, edit, or delete products.
-      </div>
-
-      {/* Category filters */}
-      <div style={{display:"flex",gap:5,marginBottom:14,flexWrap:"wrap"}}>
-        {["All",...categories].map(c=>(
-          <button key={c} onClick={()=>setCat(c)} style={{padding:"4px 12px",borderRadius:20,border:"1.5px solid",cursor:"pointer",fontSize:12,fontWeight:700,borderColor:catFilter===c?(primary||"#4f46e5"):"#e5e7eb",background:catFilter===c?(primary||"#4f46e5"):"#fff",color:catFilter===c?"#fff":"#6b7280"}}>{c}</button>
+      {/* Tabs */}
+      <div style={{display:"flex",gap:5,marginBottom:14}}>
+        {[{k:"products",l:"Products"},{k:"profits",l:"Profits"},{k:"logs",l:"Logs"}].map(t=>(
+          <button key={t.k} onClick={()=>setTab(t.k)} style={{padding:"5px 14px",borderRadius:6,border:"1px solid",cursor:"pointer",fontSize:12,fontWeight:700,borderColor:tab===t.k?P:"#e5e7eb",background:tab===t.k?P:"#fff",color:tab===t.k?"#fff":"#6b7280"}}>{t.l}</button>
         ))}
       </div>
 
-      {/* Product table */}
-      <Card style={{padding:0,overflow:"hidden"}}>
-        <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-        <table style={{width:"100%",minWidth:580,borderCollapse:"collapse",fontSize:13}}>
+      {tab==="products"&&(<>
+        {/* Read-only notice */}
+        <div style={{fontSize:11,color:"#9ca3af",marginBottom:12,padding:"7px 12px",background:"#f9fafb",borderRadius:8,border:"1px solid #e5e7eb",display:"flex",alignItems:"center",gap:6}}>
+          <i className="ti ti-lock" style={{fontSize:12}}/>Inventory is view-only in the portal. Use the POS app to add, edit, or delete products.
+        </div>
+
+        {/* Category filters */}
+        <div style={{display:"flex",gap:5,marginBottom:14,flexWrap:"wrap"}}>
+          {["All",...categories].map(c=>(
+            <button key={c} onClick={()=>setCat(c)} style={{padding:"4px 12px",borderRadius:20,border:"1.5px solid",cursor:"pointer",fontSize:12,fontWeight:700,borderColor:catFilter===c?P:"#e5e7eb",background:catFilter===c?P:"#fff",color:catFilter===c?"#fff":"#6b7280"}}>{c}</button>
+          ))}
+        </div>
+
+        {/* Product table */}
+        <Card style={{padding:0,overflow:"hidden"}}>
+          <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+          <table style={{width:"100%",minWidth:580,borderCollapse:"collapse",fontSize:13}}>
+            <thead>
+              <tr style={{background:"#f9fafb"}}>
+                {["Product","Category","Price","Stock","SKU","Status"].map(h=>(
+                  <th key={h} style={{padding:"9px 12px",textAlign:"left",fontWeight:700,fontSize:11,color:"#6b7280",borderBottom:"1px solid #e5e7eb"}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(p=>{
+                const canExpand = p.hasVariants || (p.stockMode==="auto"&&p.recipe?.length>0);
+                const isOpen = !!expanded[p.id];
+                const unit = p.stockUnit&&p.stockUnit!=="pcs" ? p.stockUnit : null;
+
+                let priceCell, stockCell;
+                if(p.hasVariants){
+                  const prices=(p.variants||[]).map(v=>v.price||0);
+                  const minP=prices.length?Math.min(...prices):0, maxP=prices.length?Math.max(...prices):0;
+                  priceCell = minP===maxP?fmt(minP):`${fmt(minP)}–${fmt(maxP)}`;
+                  if(p.variantStockMode==="shared"){
+                    stockCell = <span>{p.sharedStock||0}{unit?` ${unit}`:""} <span style={{fontSize:9,color:"#9ca3af"}}>(shared)</span></span>;
+                  } else {
+                    const totalStock=(p.variants||[]).reduce((s,v)=>s+(v.stock||0),0);
+                    stockCell = <span>{totalStock} <span style={{fontSize:9,color:"#9ca3af"}}>total</span></span>;
+                  }
+                } else if(p.stockMode==="auto"&&p.recipe?.length){
+                  const stock = Math.min(...p.recipe.map(r=>{const ing=products.find(x=>x.id===r.productId);return ing?Math.floor((ing.stock||0)/r.qty):0}));
+                  priceCell = fmt(p.price)+(p.soldByWeight?`/${unit||"kg"}`:"");
+                  stockCell = <div style={{display:"flex",alignItems:"center",gap:4}}>
+                    <span style={{fontWeight:700,color:stock===0?"#dc2626":stock<10?"#f59e0b":"#111"}}>{stock}</span>
+                    <span style={{fontSize:8,fontWeight:700,padding:"1px 4px",borderRadius:4,background:"#e0f2fe",color:"#0891b2"}}>AUTO</span>
+                  </div>;
+                } else {
+                  const stock=p.stock||0;
+                  priceCell = fmt(p.price)+(p.soldByWeight?`/${unit||"kg"}`:"");
+                  stockCell = <span style={{fontWeight:700,color:stock===0?"#dc2626":stock<10?"#f59e0b":"#111"}}>{stock}{unit?` ${unit}`:""}</span>;
+                }
+
+                return(
+                  <Fragment key={p.id}>
+                    <tr onClick={canExpand?()=>toggleExpand(p.id):undefined} style={{borderBottom:"0.5px solid #f3f4f6",cursor:canExpand?"pointer":"default"}}>
+                      <td style={{padding:"10px 12px"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          {canExpand?<i className={`ti ti-chevron-${isOpen?"down":"right"}`} style={{fontSize:13,color:"#9ca3af",flexShrink:0}}/>:<span style={{width:13,flexShrink:0}}/>}
+                          <div style={{width:36,height:36,borderRadius:8,overflow:"hidden",background:"#f3f4f6",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                            {p.image?<img src={p.image} alt={p.name} style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<i className="ti ti-photo" style={{fontSize:16,color:"#d1d5db"}}/>}
+                          </div>
+                          <div>
+                            <span style={{fontWeight:600}}>{p.name}</span>
+                            <div style={{display:"flex",gap:4,marginTop:3,flexWrap:"wrap"}}>
+                              {p.hasVariants&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#f5f3ff",color:"#7c3aed"}}>{(p.variants||[]).length} variants</span>}
+                              {p.recipe?.length>0&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#e0f2fe",color:"#0891b2"}}>{p.recipe.length} inclusions</span>}
+                              {p.recipe?.length>0&&p.stockMode==="auto"&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#f0fdf4",color:"#16a34a"}}>⚙ auto stock</span>}
+                              {p.soldByWeight&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#f0fdfa",color:"#0f766e"}}>⚖ sold by weight</span>}
+                              {p.showInPOS===false&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#fef3c7",color:"#92400e"}}>Hidden from POS</span>}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{padding:"10px 12px",color:"#6b7280"}}>{p.category}</td>
+                      <td style={{padding:"10px 12px",fontWeight:700,color:P}}>{priceCell}</td>
+                      <td style={{padding:"10px 12px"}}>{stockCell}</td>
+                      <td style={{padding:"10px 12px",fontFamily:"monospace",fontSize:11,color:"#6b7280"}}>{p.sku||"—"}</td>
+                      <td style={{padding:"10px 12px"}}>
+                        <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10,background:p.active?"#f0fdf4":"#fef2f2",color:p.active?"#166534":"#991b1b"}}>{p.active?"Active":"Inactive"}</span>
+                      </td>
+                    </tr>
+                    {isOpen&&p.hasVariants&&(
+                      <tr style={{borderBottom:"0.5px solid #f3f4f6"}}>
+                        <td colSpan={6} style={{padding:0,background:"#f9fafb"}}>
+                          <div style={{padding:"10px 16px 12px 57px"}}>
+                            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                              <thead>
+                                <tr>
+                                  <th style={{textAlign:"left",padding:"4px 8px",color:"#9ca3af",fontWeight:700,fontSize:10}}>Variant</th>
+                                  <th style={{textAlign:"right",padding:"4px 8px",color:"#9ca3af",fontWeight:700,fontSize:10}}>Price</th>
+                                  <th style={{textAlign:"right",padding:"4px 8px",color:"#9ca3af",fontWeight:700,fontSize:10}}>{p.variantStockMode==="shared"?"Uses per sale":"Stock"}</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(p.variants||[]).map(v=>(
+                                  <tr key={v.id}>
+                                    <td style={{padding:"4px 8px",fontWeight:600}}>{v.label||v.name||"—"}</td>
+                                    <td style={{padding:"4px 8px",textAlign:"right"}}>{fmt(v.price)}</td>
+                                    <td style={{padding:"4px 8px",textAlign:"right"}}>{p.variantStockMode==="shared"?`${v.uses||0} ${unit||"unit"}`:(v.stock||0)}</td>
+                                  </tr>
+                                ))}
+                                {(p.variants||[]).length===0&&<tr><td colSpan={3} style={{padding:"8px",color:"#9ca3af",textAlign:"center"}}>No variants configured</td></tr>}
+                              </tbody>
+                            </table>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    {isOpen&&p.stockMode==="auto"&&p.recipe?.length>0&&(
+                      <tr style={{borderBottom:"0.5px solid #f3f4f6"}}>
+                        <td colSpan={6} style={{padding:0,background:"#f9fafb"}}>
+                          <div style={{padding:"10px 16px 12px 57px"}}>
+                            <div style={{fontSize:10,fontWeight:700,color:"#9ca3af",marginBottom:6,textTransform:"uppercase"}}>Made from</div>
+                            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                              <thead>
+                                <tr>
+                                  <th style={{textAlign:"left",padding:"4px 8px",color:"#9ca3af",fontWeight:700,fontSize:10}}>Ingredient</th>
+                                  <th style={{textAlign:"right",padding:"4px 8px",color:"#9ca3af",fontWeight:700,fontSize:10}}>Needed per unit</th>
+                                  <th style={{textAlign:"right",padding:"4px 8px",color:"#9ca3af",fontWeight:700,fontSize:10}}>Ingredient's stock</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {p.recipe.map((r,i)=>{
+                                  const ing=products.find(x=>x.id===r.productId);
+                                  return(
+                                    <tr key={i}>
+                                      <td style={{padding:"4px 8px",fontWeight:600}}>{ing?.name||"(deleted product)"}</td>
+                                      <td style={{padding:"4px 8px",textAlign:"right"}}>{r.qty}</td>
+                                      <td style={{padding:"4px 8px",textAlign:"right",color:ing?"#111":"#dc2626"}}>{ing?ing.stock:"—"}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+              {filtered.length===0&&<tr><td colSpan={6} style={{padding:"40px",textAlign:"center",color:"#9ca3af"}}>No products found</td></tr>}
+            </tbody>
+          </table>
+          </div>
+        </Card>
+      </>)}
+
+      {tab==="profits"&&<InventoryProfits products={products} fmt={fmt} primary={P}/>}
+
+      {tab==="logs"&&<InventoryLogs logs={logs}/>}
+    </div>
+  );
+}
+
+// ── PROFITS ── mirrors the PWA's Inventory Value tab: cost/retail/profit
+// broken down by category, using each product's costPrice (optional —
+// products without one are shown but excluded from cost/profit math,
+// not silently treated as zero-cost).
+function InventoryProfits({products,fmt,primary}){
+  const simpleProducts = products.filter(p=>!p.hasVariants);
+  const variantProducts = products.filter(p=>p.hasVariants);
+
+  const withRetail = simpleProducts.map(p=>{
+    const stock = p.stockMode==="auto"&&p.recipe?.length
+      ? Math.min(...p.recipe.map(r=>{const ing=products.find(x=>x.id===r.productId);return ing?Math.floor((ing.stock||0)/r.qty):0}))
+      : (p.stock||0);
+    const hasCost = (p.costPrice||0) > 0;
+    return { p, stock, retail: stock*(p.price||0), cost: stock*(p.costPrice||0), hasCost };
+  });
+
+  const costTracked = withRetail.filter(x=>x.hasCost);
+  const retailOfCostTracked = costTracked.reduce((s,x)=>s+x.retail,0);
+  const totalCostValue = costTracked.reduce((s,x)=>s+x.cost,0);
+  const potentialProfit = retailOfCostTracked - totalCostValue;
+  const marginPct = retailOfCostTracked>0 ? (potentialProfit/retailOfCostTracked*100) : 0;
+  const missingCostCount = withRetail.length - costTracked.length;
+
+  const variantRetail = variantProducts.map(p=>{
+    let value = 0;
+    if(p.variantStockMode==="shared"){
+      const rates=(p.variants||[]).filter(v=>v.uses>0).map(v=>(v.price||0)/v.uses);
+      const avgRate=rates.length?rates.reduce((s,r)=>s+r,0)/rates.length:0;
+      value=(p.sharedStock||0)*avgRate;
+    } else {
+      value=(p.variants||[]).reduce((s,v)=>s+((v.stock||0)*(v.price||0)),0);
+    }
+    return { p, value };
+  });
+  const totalRetailAll = withRetail.reduce((s,x)=>s+x.retail,0) + variantRetail.reduce((s,x)=>s+x.value,0);
+
+  const byCategory={};
+  withRetail.forEach(x=>{
+    const cat=x.p.category||"Uncategorized";
+    if(!byCategory[cat]) byCategory[cat]={retail:0,cost:0,hasCostCount:0,itemCount:0};
+    byCategory[cat].retail+=x.retail;
+    byCategory[cat].itemCount+=1;
+    if(x.hasCost){ byCategory[cat].cost+=x.cost; byCategory[cat].hasCostCount+=1; }
+  });
+  const catRows=Object.entries(byCategory).sort((a,b)=>b[1].retail-a[1].retail);
+
+  return(
+    <div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:16}}>
+        <Card style={{padding:12}}>
+          <div style={{fontSize:10,color:"#9ca3af",marginBottom:4}}>Total Retail Value</div>
+          <div style={{fontSize:17,fontWeight:800,color:primary}}>{fmt(totalRetailAll)}</div>
+        </Card>
+        <Card style={{padding:12}}>
+          <div style={{fontSize:10,color:"#9ca3af",marginBottom:4}}>Total Cost Value</div>
+          <div style={{fontSize:17,fontWeight:800,color:"#b45309"}}>{fmt(totalCostValue)}</div>
+        </Card>
+        <Card style={{padding:12}}>
+          <div style={{fontSize:10,color:"#9ca3af",marginBottom:4}}>Potential Profit</div>
+          <div style={{fontSize:17,fontWeight:800,color:"#059669"}}>{fmt(potentialProfit)}</div>
+        </Card>
+        <Card style={{padding:12}}>
+          <div style={{fontSize:10,color:"#9ca3af",marginBottom:4}}>Margin</div>
+          <div style={{fontSize:17,fontWeight:800,color:"#7c3aed"}}>{costTracked.length?`${marginPct.toFixed(1)}%`:"—"}</div>
+        </Card>
+      </div>
+
+      <div style={{fontSize:11,color:"#9ca3af",marginBottom:16,lineHeight:1.5}}>
+        Cost Value, Potential Profit, and Margin are calculated only from products with a Cost Price set in the POS app. "Total Retail Value" includes every product regardless.
+      </div>
+
+      {missingCostCount>0&&(
+        <div style={{padding:"10px 14px",background:"#fffbeb",border:"1px solid #fde68a",borderRadius:10,color:"#92400e",fontSize:12,marginBottom:16,display:"flex",alignItems:"center",gap:8}}>
+          <i className="ti ti-alert-triangle" style={{fontSize:15,flexShrink:0}}/>
+          {missingCostCount} product{missingCostCount===1?"":"s"} {missingCostCount===1?"doesn't":"don't"} have a Cost Price set yet — {missingCostCount===1?"it isn't":"they aren't"} included in the profit/margin numbers above.
+        </div>
+      )}
+
+      <div style={{fontWeight:800,fontSize:14,marginBottom:10}}>By Category</div>
+      <Card style={{padding:0,overflow:"hidden",marginBottom:16}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
           <thead>
             <tr style={{background:"#f9fafb"}}>
-              {["Product","Category","Price","Stock","SKU","Status"].map(h=>(
-                <th key={h} style={{padding:"9px 12px",textAlign:"left",fontWeight:700,fontSize:11,color:"#6b7280",borderBottom:"1px solid #e5e7eb"}}>{h}</th>
+              <th style={{textAlign:"left",padding:"8px 12px",color:"#6b7280",fontWeight:700}}>Category</th>
+              <th style={{textAlign:"right",padding:"8px 12px",color:"#6b7280",fontWeight:700}}>Items</th>
+              <th style={{textAlign:"right",padding:"8px 12px",color:"#6b7280",fontWeight:700}}>Retail Value</th>
+              <th style={{textAlign:"right",padding:"8px 12px",color:"#6b7280",fontWeight:700}}>Cost Value</th>
+              <th style={{textAlign:"right",padding:"8px 12px",color:"#6b7280",fontWeight:700}}>Profit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {catRows.map(([cat,d])=>(
+              <tr key={cat} style={{borderTop:"1px solid #f3f4f6"}}>
+                <td style={{padding:"8px 12px",fontWeight:700}}>{cat}</td>
+                <td style={{padding:"8px 12px",textAlign:"right",color:"#6b7280"}}>{d.itemCount}{d.hasCostCount<d.itemCount&&<span style={{color:"#d97706"}}> ({d.itemCount-d.hasCostCount} no cost)</span>}</td>
+                <td style={{padding:"8px 12px",textAlign:"right"}}>{fmt(d.retail)}</td>
+                <td style={{padding:"8px 12px",textAlign:"right",color:d.hasCostCount?"#111":"#d1d5db"}}>{d.hasCostCount?fmt(d.cost):"—"}</td>
+                <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,color:d.hasCostCount?"#059669":"#d1d5db"}}>{d.hasCostCount?fmt(d.retail-d.cost):"—"}</td>
+              </tr>
+            ))}
+            {catRows.length===0&&<tr><td colSpan={5} style={{padding:"24px",textAlign:"center",color:"#9ca3af"}}>No products yet</td></tr>}
+          </tbody>
+        </table>
+      </Card>
+
+      {variantProducts.length>0&&(
+        <>
+          <div style={{fontWeight:800,fontSize:14,marginBottom:10}}>Products with Variants <span style={{fontWeight:400,color:"#9ca3af",fontSize:11}}>— retail value only, cost tracking not yet available per-variant</span></div>
+          <Card style={{padding:0,overflow:"hidden"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
+              <tbody>
+                {variantRetail.map(({p,value})=>(
+                  <tr key={p.id} style={{borderTop:"1px solid #f3f4f6"}}>
+                    <td style={{padding:"8px 12px",fontWeight:700}}>{p.name}</td>
+                    <td style={{padding:"8px 12px",textAlign:"right"}}>{fmt(value)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── LOGS ── straightforward filterable feed of data.logs, same idea as
+// the PWA's Logs tab.
+function InventoryLogs({logs}){
+  const [typeFilter,setTypeFilter]=useState("all");
+  const [search,setSearch]=useState("");
+  const types=["all",...new Set(logs.map(l=>l.type).filter(Boolean))];
+  const filtered=logs.filter(l=>
+    (typeFilter==="all"||l.type===typeFilter)&&
+    (!search||l.detail?.toLowerCase().includes(search.toLowerCase())||l.action?.toLowerCase().includes(search.toLowerCase()))
+  ).sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0));
+
+  return(
+    <div>
+      <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search logs…" style={{...INP,flex:1,minWidth:180,padding:"7px 12px"}}/>
+        <select value={typeFilter} onChange={e=>setTypeFilter(e.target.value)} style={{...INP,width:160,padding:"7px 12px"}}>
+          {types.map(t=><option key={t} value={t}>{t==="all"?"All types":t}</option>)}
+        </select>
+      </div>
+      <Card style={{padding:0,overflow:"hidden"}}>
+        <div style={{overflowX:"auto"}}>
+        <table style={{width:"100%",minWidth:520,borderCollapse:"collapse",fontSize:12.5}}>
+          <thead>
+            <tr style={{background:"#f9fafb"}}>
+              {["Time","Type","Action","Detail"].map(h=>(
+                <th key={h} style={{padding:"8px 12px",textAlign:"left",fontWeight:700,fontSize:11,color:"#6b7280",borderBottom:"1px solid #e5e7eb"}}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {filtered.map(p=>(
-              <tr key={p.id} style={{borderBottom:"0.5px solid #f3f4f6"}}>
-                <td style={{padding:"10px 12px"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:10}}>
-                    <div style={{width:36,height:36,borderRadius:8,overflow:"hidden",background:"#f3f4f6",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      {p.image?<img src={p.image} alt={p.name} style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<i className="ti ti-photo" style={{fontSize:16,color:"#d1d5db"}}/>}
-                    </div>
-                    <div>
-                      <span style={{fontWeight:600}}>{p.name}</span>
-                      <div style={{display:"flex",gap:4,marginTop:3,flexWrap:"wrap"}}>
-                        {p.recipe?.length>0&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#e0f2fe",color:"#0891b2"}}>{p.recipe.length} inclusions</span>}
-                        {p.recipe?.length>0&&p.stockMode==="auto"&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#f0fdf4",color:"#16a34a"}}>⚙ auto stock</span>}
-                        {p.showInPOS===false&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#fef3c7",color:"#92400e"}}>Hidden from POS</span>}
-                      </div>
-                    </div>
-                  </div>
-                </td>
-                <td style={{padding:"10px 12px",color:"#6b7280"}}>{p.category}</td>
-                <td style={{padding:"10px 12px",fontWeight:700,color:primary||"#4f46e5"}}>{fmt(p.price)}</td>
-                <td style={{padding:"10px 12px"}}>
-                  {(()=>{
-                    const stock = p.stockMode==="auto"&&p.recipe?.length
-                      ? Math.min(...p.recipe.map(r=>{const ing=products.find(x=>x.id===r.productId);return ing?Math.floor((ing.stock||0)/r.qty):0}))
-                      : (p.stock||0);
-                    return(<div style={{display:"flex",alignItems:"center",gap:4}}>
-                      <span style={{fontWeight:700,color:stock===0?"#dc2626":stock<10?"#f59e0b":"#111"}}>{stock}</span>
-                      {p.stockMode==="auto"&&<span style={{fontSize:8,fontWeight:700,padding:"1px 4px",borderRadius:4,background:"#e0f2fe",color:"#0891b2"}}>AUTO</span>}
-                    </div>);
-                  })()}
-                </td>
-                <td style={{padding:"10px 12px",fontFamily:"monospace",fontSize:11,color:"#6b7280"}}>{p.sku||"—"}</td>
-                <td style={{padding:"10px 12px"}}>
-                  <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10,background:p.active?"#f0fdf4":"#fef2f2",color:p.active?"#166534":"#991b1b"}}>{p.active?"Active":"Inactive"}</span>
-                </td>
+            {filtered.slice(0,300).map((l,i)=>(
+              <tr key={i} style={{borderBottom:"0.5px solid #f3f4f6"}}>
+                <td style={{padding:"8px 12px",color:"#9ca3af",whiteSpace:"nowrap",fontSize:11}}>{l.ts?new Date(l.ts).toLocaleString("en-PH"):"—"}</td>
+                <td style={{padding:"8px 12px"}}><span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:8,background:"#f3f4f6",color:"#374151"}}>{l.type||"—"}</span></td>
+                <td style={{padding:"8px 12px",fontWeight:600}}>{l.action||"—"}</td>
+                <td style={{padding:"8px 12px",color:"#6b7280"}}>{l.detail||"—"}</td>
               </tr>
             ))}
-            {filtered.length===0&&<tr><td colSpan={6} style={{padding:"40px",textAlign:"center",color:"#9ca3af"}}>No products found</td></tr>}
+            {filtered.length===0&&<tr><td colSpan={4} style={{padding:"40px",textAlign:"center",color:"#9ca3af"}}>No logs found</td></tr>}
           </tbody>
         </table>
         </div>
+        {filtered.length>300&&<div style={{padding:"8px 12px",fontSize:11,color:"#9ca3af",textAlign:"center"}}>Showing latest 300 of {filtered.length} entries</div>}
       </Card>
     </div>
   );
 }
+
 
 
 // ════════════ ORDERS ════════════
