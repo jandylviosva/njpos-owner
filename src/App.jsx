@@ -939,7 +939,18 @@ function Reports({store,data,primary,isOwner,saveField}){
   const cashierS={};orders.forEach(o=>{cashierS[o.cashier]=(cashierS[o.cashier]||{n:0,rev:0});cashierS[o.cashier].n++;cashierS[o.cashier].rev+=o.total;});
   const typeS={};orders.forEach(o=>{if(o.orderType){typeS[o.orderType]=(typeS[o.orderType]||0)+o.total;}});
   const PERIODS=[{k:"today",l:"Today"},{k:"week",l:"Week"},{k:"month",l:"Month"},{k:"all",l:"All"},{k:"custom",l:"Custom"}];
-  const periodLabel=PERIODS.find(p=>p.k===period)?.l||period;
+  const fmtDate=(d)=>new Date(d).toLocaleDateString("en-PH",{month:"short",day:"numeric",year:"numeric"});
+  const todayFmt=fmtDate(todayKey());
+  const periodLabel = period==="today" ? todayFmt
+    : period==="week" ? `${fmtDate(weekStart())} – ${todayFmt}`
+    : period==="month" ? `${fmtDate(monthStart())} – ${todayFmt}`
+    : period==="all" ? "All Time"
+    : (from?fmtDate(from):"Start")+" – "+(to?fmtDate(to):"Today");
+  const shiftPeriodLabel = shiftPeriod==="today" ? todayFmt
+    : shiftPeriod==="week" ? `${fmtDate(weekStart())} – ${todayFmt}`
+    : shiftPeriod==="month" ? `${fmtDate(monthStart())} – ${todayFmt}`
+    : shiftPeriod==="custom" ? (shiftFrom?fmtDate(shiftFrom):"Start")+" – "+(shiftTo?fmtDate(shiftTo):"Today")
+    : "All Time";
   // BIR
   const birOrders=allOrders.filter(o=>o.dateKey?.startsWith(birMonth));
   const birGross=birOrders.reduce((s,o)=>s+o.total,0);
@@ -960,7 +971,7 @@ function Reports({store,data,primary,isOwner,saveField}){
         :"";
       return `<tr><td>${s.cashier}</td><td style="font-size:10px">${s.startTime}<br/>${s.endTime}</td><td class="right">${s.shiftOrders}</td><td class="right">${fmt(s.openCash)}</td><td class="right">${fmt(s.totalSales)}</td><td class="right">${fmt(s.totalExpenses||0)}</td><td class="right">${fmt(s.closeCash)}</td><td class="right ${s.overShort>=0?"green":"red"}">${s.overShort>=0?"+":""}${fmt(s.overShort)}</td></tr>${payRow}`;
     }).join("");
-    printReport(`<h1>Shift Report</h1><p class="meta">Store: ${store?.store_name} | ${filteredShifts.length} shifts</p><table><thead><tr><th>Cashier</th><th>Period</th><th class="right">Orders</th><th class="right">Opening</th><th class="right">Sales</th><th class="right">Expenses</th><th class="right">Closing</th><th class="right">Over/Short</th></tr></thead><tbody>${rows}</tbody></table>`,`Shift Report — ${store?.store_name}`);
+    printReport(`<h1>Shift Report — ${shiftPeriodLabel}</h1><p class="meta">Store: ${store?.store_name} | ${filteredShifts.length} shifts</p><table><thead><tr><th>Cashier</th><th>Period</th><th class="right">Orders</th><th class="right">Opening</th><th class="right">Sales</th><th class="right">Expenses</th><th class="right">Closing</th><th class="right">Over/Short</th></tr></thead><tbody>${rows}</tbody></table>`,`Shift Report — ${store?.store_name}`);
   };
   const doPrintBIR=()=>{
     printReport(`<h1>BIR Tax Reference — ${birMonth}</h1><p class="meta">Store: ${store?.store_name} | For reference only</p><table><thead><tr><th>Category</th><th class="right">Amount</th></tr></thead><tbody><tr><td>Gross Sales</td><td class="right bold">${fmt(birGross)}</td></tr><tr><td>VATable Sales</td><td class="right">${fmt(birVatable)}</td></tr><tr><td><b>Output VAT (12%)</b></td><td class="right bold" style="color:#4f46e5">${fmt(birVat)}</td></tr><tr><td>VAT-Exempt Sales</td><td class="right">${fmt(birExempt)}</td></tr><tr><td>Zero-Rated</td><td class="right">₱0.00</td></tr><tr><td>Total Orders</td><td class="right">${birOrders.length}</td></tr></tbody></table><div style="margin-top:14px;padding:10px 14px;background:#fef3c7;border-radius:8px;font-size:11px;color:#92400e">⚠️ For reference only. Consult your licensed accountant for official BIR filings.</div>`,`BIR Tax — ${store?.store_name}`);
@@ -1062,6 +1073,16 @@ function Reports({store,data,primary,isOwner,saveField}){
 // missing, deleted, a variant product (no per-variant cost support yet),
 // or has no cost price set — callers show that plainly rather than
 // silently treating it as ₱0.
+// Reconstructs a variant's display name from its options (e.g. {Size:
+// "Small"} → "Small"; two variant types → "Small / Red") in the order
+// the product's variantTypes are defined — mirrors the PWA's helper.
+// Variants don't carry a flat label/name field, just this options map,
+// so without this every variant row would show as blank.
+const variantLabel = (p, variant) => {
+  if(!variant) return "";
+  const order = (p.variantTypes||[]).map(t=>t.name);
+  return order.map(name=>variant.options?.[name]).filter(Boolean).join(" / ");
+};
 const computeRecipeCost = (p, allProducts) => {
   if(!p.recipe || !p.recipe.length) return {cost:0, complete:true};
   let cost=0, complete=true;
@@ -1236,10 +1257,12 @@ function Inventory({store,data,session,primary}){
                               <tbody>
                                 {(p.variants||[]).map(v=>(
                                   <tr key={v.id}>
-                                    <td style={{padding:"4px 8px",fontWeight:600}}>{v.label||v.name||"—"}</td>
+                                    <td style={{padding:"4px 8px",fontWeight:600}}>{variantLabel(p,v)||"—"}</td>
                                     <td style={{padding:"4px 8px",textAlign:"right"}}>{fmt(v.price)}</td>
                                     <td style={{padding:"4px 8px",textAlign:"right",color:v.costPrice>0?"#111":"#d1d5db"}}>{p.variantStockMode==="shared"?"—":(v.costPrice>0?fmt(v.costPrice):"not set")}</td>
-                                    <td style={{padding:"4px 8px",textAlign:"right"}}>{p.variantStockMode==="shared"?`${v.uses||0} ${unit||"unit"}`:(v.stock||0)}</td>
+                                    <td style={{padding:"4px 8px",textAlign:"right",fontWeight:p.variantStockMode==="shared"?400:700,color:p.variantStockMode==="shared"?"#374151":((v.stock||0)<=0?"#dc2626":(v.stock||0)<=5?"#d97706":"#111")}}>
+                                      {p.variantStockMode==="shared"?`${v.uses||0} ${unit||"unit"}`:(v.stock||0)}
+                                    </td>
                                   </tr>
                                 ))}
                                 {(p.variants||[]).length===0&&<tr><td colSpan={4} style={{padding:"8px",color:"#9ca3af",textAlign:"center"}}>No variants configured</td></tr>}
@@ -1501,19 +1524,65 @@ function Orders({store,data,session,saveField}){
   const [filter,setFilter]=useState("all");
   const [search,setSearch]=useState("");
   const [detail,setDetail]=useState(null);
+  const [period,setPeriod]=useState("today");
+  const [from,setFrom]=useState("");
+  const [to,setTo]=useState("");
   const orders=data?.orders||[];
-  const filtered=orders.filter(o=>(filter==="all"||o.status===filter)&&(o.id?.toLowerCase().includes(search.toLowerCase())||o.cashier?.toLowerCase().includes(search.toLowerCase())));
+
+  const inPeriod=o=>{
+    if(period==="today")  return o.dateKey===todayKey();
+    if(period==="week")   return o.dateKey>=weekStart();
+    if(period==="month")  return o.dateKey>=monthStart();
+    if(period==="all")    return true;
+    if(period==="custom") return(!from||o.dateKey>=from)&&(!to||o.dateKey<=to);
+    return true;
+  };
+  const filtered=orders.filter(o=>inPeriod(o)&&(filter==="all"||o.status===filter)&&(o.id?.toLowerCase().includes(search.toLowerCase())||o.cashier?.toLowerCase().includes(search.toLowerCase())));
+
+  const fmtDate=(d)=>new Date(d).toLocaleDateString("en-PH",{month:"short",day:"numeric",year:"numeric"});
+  const todayFmt=fmtDate(todayKey());
+  const periodLabel = period==="today" ? todayFmt
+    : period==="week" ? `${fmtDate(weekStart())} – ${todayFmt}`
+    : period==="month" ? `${fmtDate(monthStart())} – ${todayFmt}`
+    : period==="all" ? "All Time"
+    : (from?fmtDate(from):"Start")+" – "+(to?fmtDate(to):"Today");
+
+  const doPrint=()=>{
+    const inRange = orders.filter(inPeriod).sort((a,b)=>new Date(b.date)-new Date(a.date));
+    const rows = inRange.slice(0,300).map(o=>{
+      const statusColor = o.status==="paid"?"#166534":o.status==="open"?"#c2410c":"#991b1b";
+      const itemsSummary = (o.items||[]).map(i=>`${i.name} ×${i.qty}`).join(", ");
+      return `<tr><td style="font-family:monospace;font-size:11px">${o.id}</td><td>${o.date}</td><td>${o.cashier}</td><td style="color:${statusColor};font-weight:700;text-transform:capitalize">${o.status==="open"?"Open Bill":o.status}</td><td style="font-size:11px;color:#6b7280">${itemsSummary}</td><td>${(o.payMethod||"—").toUpperCase()}</td><td class="right bold">${fmt(o.total)}</td></tr>`;
+    }).join("");
+    const paidCount = inRange.filter(o=>o.status==="paid").length;
+    const voidCount = inRange.filter(o=>o.status==="void").length;
+    const openCount = inRange.filter(o=>o.status==="open").length;
+    const totalRevenue = inRange.filter(o=>o.status==="paid").reduce((s,o)=>s+o.total,0);
+    printReport(`<h1>Orders Report — ${periodLabel}</h1><p class="meta">Store: ${store?.store_name} | ${new Date().toLocaleString("en-PH")} | ${inRange.length} orders</p><div class="summary"><div class="card"><div class="card-label">Paid</div><div class="card-val" style="color:#16a34a">${paidCount}</div></div><div class="card"><div class="card-label">Open Bills</div><div class="card-val" style="color:#c2410c">${openCount}</div></div><div class="card"><div class="card-label">Voided</div><div class="card-val" style="color:#dc2626">${voidCount}</div></div></div><p class="meta" style="margin-top:-10px">Revenue (Paid): <b>${fmt(totalRevenue)}</b></p><h2>Order List${inRange.length>300?" (first 300)":""}</h2><table><thead><tr><th>Order ID</th><th>Date</th><th>Cashier</th><th>Status</th><th>Items</th><th>Payment</th><th class="right">Total</th></tr></thead><tbody>${rows||'<tr><td colspan="7" style="text-align:center;color:#9ca3af">No orders in this range</td></tr>'}</tbody></table>`, `Orders Report — ${store?.store_name}`);
+  };
 
   // Orders are read-only in portal
 
   return(
     <div>
-      <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:14,flexWrap:"wrap"}}>
+      <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:10,flexWrap:"wrap"}}>
         <span style={{fontWeight:800,fontSize:18,marginRight:4}}>Orders</span>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search order ID or cashier…" style={{...INP,flex:1,minWidth:180,padding:"7px 12px"}}/>
         <div style={{display:"flex",gap:5}}>
           {["all","paid","void"].map(f=><button key={f} onClick={()=>setFilter(f)} style={{padding:"5px 12px",borderRadius:6,border:"1px solid",cursor:"pointer",fontSize:12,fontWeight:700,textTransform:"capitalize",borderColor:filter===f?"#4f46e5":"#e5e7eb",background:filter===f?"#4f46e5":"#fff",color:filter===f?"#fff":"#6b7280"}}>{f}</button>)}
         </div>
+      </div>
+      <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:14,flexWrap:"wrap"}}>
+        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+          {[{k:"today",l:"Today"},{k:"week",l:"Week"},{k:"month",l:"Month"},{k:"all",l:"All"},{k:"custom",l:"Custom"}].map(p=>(
+            <button key={p.k} onClick={()=>setPeriod(p.k)} style={{padding:"4px 9px",borderRadius:6,border:"1px solid",cursor:"pointer",fontSize:11,fontWeight:700,borderColor:period===p.k?"#4f46e5":"#e5e7eb",background:period===p.k?"#4f46e5":"#fff",color:period===p.k?"#fff":"#6b7280"}}>{p.l}</button>
+          ))}
+        </div>
+        {period==="custom"&&(<>
+          <div style={{display:"flex",alignItems:"center",gap:4}}><label style={{fontSize:11,color:"#6b7280",fontWeight:700}}>From</label><input type="date" value={from} onChange={e=>setFrom(e.target.value)} style={{padding:"4px 8px",border:"1px solid #e5e7eb",borderRadius:6,fontSize:11}}/></div>
+          <div style={{display:"flex",alignItems:"center",gap:4}}><label style={{fontSize:11,color:"#6b7280",fontWeight:700}}>To</label><input type="date" value={to} onChange={e=>setTo(e.target.value)} style={{padding:"4px 8px",border:"1px solid #e5e7eb",borderRadius:6,fontSize:11}}/></div>
+        </>)}
+        <button onClick={doPrint} style={{marginLeft:"auto",padding:"5px 12px",background:"#374151",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:5}}><i className="ti ti-printer" style={{fontSize:14}}/>Print</button>
       </div>
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
         {filtered.length===0&&<Card><div style={{textAlign:"center",color:"#9ca3af",padding:"24px 0",fontSize:13}}>No orders found</div></Card>}
