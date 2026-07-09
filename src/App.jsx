@@ -1241,35 +1241,27 @@ function Inventory({store,data,session,primary}){
                         <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10,background:p.active?"#f0fdf4":"#fef2f2",color:p.active?"#166534":"#991b1b"}}>{p.active?"Active":"Inactive"}</span>
                       </td>
                     </tr>
-                    {isOpen&&p.hasVariants&&(
-                      <tr style={{borderBottom:"0.5px solid #f3f4f6"}}>
-                        <td colSpan={7} style={{padding:0,background:"#f9fafb"}}>
-                          <div style={{padding:"10px 16px 12px 57px"}}>
-                            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                              <thead>
-                                <tr>
-                                  <th style={{textAlign:"left",padding:"4px 8px",color:"#9ca3af",fontWeight:700,fontSize:10}}>Variant</th>
-                                  <th style={{textAlign:"right",padding:"4px 8px",color:"#9ca3af",fontWeight:700,fontSize:10}}>Price</th>
-                                  <th style={{textAlign:"right",padding:"4px 8px",color:"#9ca3af",fontWeight:700,fontSize:10}}>Cost</th>
-                                  <th style={{textAlign:"right",padding:"4px 8px",color:"#9ca3af",fontWeight:700,fontSize:10}}>{p.variantStockMode==="shared"?"Uses per sale":"Stock"}</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {(p.variants||[]).map(v=>(
-                                  <tr key={v.id}>
-                                    <td style={{padding:"4px 8px",fontWeight:600}}>{variantLabel(p,v)||"—"}</td>
-                                    <td style={{padding:"4px 8px",textAlign:"right"}}>{fmt(v.price)}</td>
-                                    <td style={{padding:"4px 8px",textAlign:"right",color:v.costPrice>0?"#111":"#d1d5db"}}>{p.variantStockMode==="shared"?"—":(v.costPrice>0?fmt(v.costPrice):"not set")}</td>
-                                    <td style={{padding:"4px 8px",textAlign:"right",fontWeight:p.variantStockMode==="shared"?400:700,color:p.variantStockMode==="shared"?"#374151":((v.stock||0)<=0?"#dc2626":(v.stock||0)<=5?"#d97706":"#111")}}>
-                                      {p.variantStockMode==="shared"?`${v.uses||0} ${unit||"unit"}`:(v.stock||0)}
-                                    </td>
-                                  </tr>
-                                ))}
-                                {(p.variants||[]).length===0&&<tr><td colSpan={4} style={{padding:"8px",color:"#9ca3af",textAlign:"center"}}>No variants configured</td></tr>}
-                              </tbody>
-                            </table>
-                          </div>
+                    {isOpen&&p.hasVariants&&(p.variants||[]).map(v=>(
+                      <tr key={v.id} style={{borderBottom:"0.5px solid #f3f4f6",background:"#fafaff"}}>
+                        <td style={{padding:"7px 12px 7px 57px",color:"#6b7280",fontSize:12}}>
+                          <i className="ti ti-corner-down-right" style={{fontSize:11,color:"#c7d2fe",marginRight:6}}/>
+                          {variantLabel(p,v)||"—"}
                         </td>
+                        <td style={{padding:"7px 12px"}}></td>
+                        <td style={{padding:"7px 12px",fontWeight:700,color:P,fontSize:12}}>{fmt(v.price)}</td>
+                        <td style={{padding:"7px 12px",fontSize:12,color:p.variantStockMode==="shared"?"#9ca3af":(v.costPrice>0?"#111":"#d1d5db")}}>
+                          {p.variantStockMode==="shared"?"—":(v.costPrice>0?fmt(v.costPrice):"not set")}
+                        </td>
+                        <td style={{padding:"7px 12px",fontSize:12,fontWeight:p.variantStockMode==="shared"?400:700,color:p.variantStockMode==="shared"?"#374151":((v.stock||0)<=0?"#dc2626":(v.stock||0)<=5?"#d97706":"#111")}}>
+                          {p.variantStockMode==="shared"?`${v.uses||0} ${unit||"unit"} used`:(v.stock||0)}
+                        </td>
+                        <td style={{padding:"7px 12px",fontFamily:"monospace",fontSize:11,color:"#6b7280"}}>{v.sku||"—"}</td>
+                        <td style={{padding:"7px 12px"}}></td>
+                      </tr>
+                    ))}
+                    {isOpen&&p.hasVariants&&(p.variants||[]).length===0&&(
+                      <tr style={{borderBottom:"0.5px solid #f3f4f6",background:"#fafaff"}}>
+                        <td colSpan={7} style={{padding:"8px 12px 8px 57px",color:"#9ca3af",fontSize:12}}>No variants configured</td>
                       </tr>
                     )}
                     {isOpen&&p.stockMode==="auto"&&p.recipe?.length>0&&(
