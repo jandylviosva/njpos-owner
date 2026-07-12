@@ -588,6 +588,9 @@ function LoginScreen({onLogin}){
 }
 // ════════════ DASHBOARD ════════════
 function Dashboard({store,data,primary,licenseRow}){
+  const [ordersShown,setOrdersShown] = useState(20);
+  const [stockShown,setStockShown] = useState(20);
+  const [shiftsShown,setShiftsShown] = useState(20);
   const orders=(data?.orders||[]).filter(o=>o.status==="paid");
   const products=data?.products||[];
   const shifts=data?.shifts||[];
@@ -598,6 +601,7 @@ function Dashboard({store,data,primary,licenseRow}){
   const weekSales=weekOrders.reduce((s,o)=>s+o.total,0);
   const lowStock=products.filter(p=>p.active&&computeStockPortal(p,products)>0&&computeStockPortal(p,products)<=5);
   const outOfStock=products.filter(p=>p.active&&computeStockPortal(p,products)<=0);
+  const stockAlerts=[...outOfStock.map(p=>({...p,_out:true})), ...lowStock.map(p=>({...p,_out:false}))];
   const CARDS=[
     {label:"Today's Sales",  value:fmt(todaySales), sub:`${todayOrders.length} orders`,    color:primary,    icon:"ti-currency-peso"},
     {label:"This Week",      value:fmt(weekSales),  sub:`${weekOrders.length} orders`,     color:"#0891b2",  icon:"ti-chart-line"},
@@ -693,7 +697,7 @@ function Dashboard({store,data,primary,licenseRow}){
         <Card>
           <SectionTitle>Today's Orders ({todayOrders.length})</SectionTitle>
           {todayOrders.length===0&&<div style={{fontSize:13,color:"#9ca3af",textAlign:"center",padding:"16px 0"}}>No orders today yet</div>}
-          {todayOrders.slice(0,8).map(o=>(
+          {todayOrders.slice(0,ordersShown).map(o=>(
             <div key={o.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #f3f4f6"}}>
               <div>
                 <div style={{fontSize:12,fontWeight:700,fontFamily:"monospace"}}>{o.id}</div>
@@ -702,19 +706,26 @@ function Dashboard({store,data,primary,licenseRow}){
               <div style={{fontWeight:800,fontSize:13,color:primary}}>{fmt(o.total)}</div>
             </div>
           ))}
-          {todayOrders.length>8&&<div style={{fontSize:11,color:"#9ca3af",marginTop:8,textAlign:"center"}}>+{todayOrders.length-8} more orders</div>}
+          {todayOrders.length>ordersShown&&<div onClick={()=>setOrdersShown(n=>n+20)} style={{fontSize:12,color:primary,fontWeight:700,marginTop:10,textAlign:"center",cursor:"pointer"}}>Show more ({todayOrders.length-ordersShown} left)</div>}
         </Card>
         {/* Stock alerts */}
         <Card>
           <SectionTitle>Stock Alerts</SectionTitle>
-          {outOfStock.length===0&&lowStock.length===0&&<div style={{fontSize:13,color:"#16a34a",textAlign:"center",padding:"12px 0"}}>✅ All products well stocked</div>}
-          {outOfStock.map(p=><div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 10px",background:"#fef2f2",borderRadius:8,marginBottom:6}}><span style={{fontSize:13,fontWeight:600}}>{p.name}</span><span style={{fontSize:11,fontWeight:800,color:"#991b1b",background:"#fee2e2",padding:"2px 8px",borderRadius:10}}>OUT</span></div>)}
-          {lowStock.map(p=><div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 10px",background:"#fffbeb",borderRadius:8,marginBottom:6}}><span style={{fontSize:13,fontWeight:600}}>{p.name}</span><span style={{fontSize:11,fontWeight:800,color:"#92400e",background:"#fef3c7",padding:"2px 8px",borderRadius:10}}>{p.stock} left</span></div>)}
+          {stockAlerts.length===0&&<div style={{fontSize:13,color:"#16a34a",textAlign:"center",padding:"12px 0"}}>✅ All products well stocked</div>}
+          {stockAlerts.slice(0,stockShown).map(p=>(
+            <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 10px",background:p._out?"#fef2f2":"#fffbeb",borderRadius:8,marginBottom:6}}>
+              <span style={{fontSize:13,fontWeight:600}}>{p.name}</span>
+              {p._out
+                ? <span style={{fontSize:11,fontWeight:800,color:"#991b1b",background:"#fee2e2",padding:"2px 8px",borderRadius:10}}>OUT</span>
+                : <span style={{fontSize:11,fontWeight:800,color:"#92400e",background:"#fef3c7",padding:"2px 8px",borderRadius:10}}>{p.stock} left</span>}
+            </div>
+          ))}
+          {stockAlerts.length>stockShown&&<div onClick={()=>setStockShown(n=>n+20)} style={{fontSize:12,color:primary,fontWeight:700,marginTop:4,textAlign:"center",cursor:"pointer"}}>Show more ({stockAlerts.length-stockShown} left)</div>}
         </Card>
         {/* Recent shifts */}
         {shifts.length>0&&<Card>
           <SectionTitle>Recent Shifts</SectionTitle>
-          {shifts.slice(0,5).map(s=>(
+          {[...shifts].sort((a,b)=>new Date(b.startTime)-new Date(a.startTime)).slice(0,shiftsShown).map(s=>(
             <div key={s.id} style={{padding:"7px 0",borderBottom:"1px solid #f3f4f6"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <div style={{fontSize:13,fontWeight:700}}>{s.cashier}{s.deviceName&&<span style={{fontSize:10,fontWeight:600,color:"#9ca3af"}}> · {s.deviceName}</span>}</div>
@@ -723,6 +734,7 @@ function Dashboard({store,data,primary,licenseRow}){
               <div style={{fontSize:11,color:"#9ca3af",marginTop:2}}>{s.startTime} · Sales: {fmt(s.totalSales)} · {s.shiftOrders} orders</div>
             </div>
           ))}
+          {shifts.length>shiftsShown&&<div onClick={()=>setShiftsShown(n=>n+20)} style={{fontSize:12,color:primary,fontWeight:700,marginTop:8,textAlign:"center",cursor:"pointer"}}>Show more ({shifts.length-shiftsShown} left)</div>}
         </Card>}
       </div>
     </div>
