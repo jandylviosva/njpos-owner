@@ -1168,7 +1168,8 @@ function LoyaltyTab({data,primary}){
       </div>
 
       <Card style={{padding:0,overflow:"hidden"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
+        <div style={{overflowX:"auto"}}>
+        <table style={{width:"100%",minWidth:480,borderCollapse:"collapse",fontSize:12.5}}>
           <thead>
             <tr style={{background:"#f9fafb"}}>
               <th style={{textAlign:"left",padding:"8px 12px",color:"#6b7280",fontWeight:700}}>Customer</th>
@@ -1189,6 +1190,7 @@ function LoyaltyTab({data,primary}){
             {filtered.length===0&&<tr><td colSpan={4} style={{padding:"24px",textAlign:"center",color:"#9ca3af"}}>No loyalty members yet</td></tr>}
           </tbody>
         </table>
+        </div>
       </Card>
     </div>
   );
@@ -1496,7 +1498,8 @@ function InventoryProfits({products,fmt,primary}){
 
       <div style={{fontWeight:800,fontSize:14,marginBottom:10}}>By Category</div>
       <Card style={{padding:0,overflow:"hidden",marginBottom:16}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
+        <div style={{overflowX:"auto"}}>
+        <table style={{width:"100%",minWidth:480,borderCollapse:"collapse",fontSize:12.5}}>
           <thead>
             <tr style={{background:"#f9fafb"}}>
               <th style={{textAlign:"left",padding:"8px 12px",color:"#6b7280",fontWeight:700}}>Category</th>
@@ -1519,13 +1522,15 @@ function InventoryProfits({products,fmt,primary}){
             {catRows.length===0&&<tr><td colSpan={5} style={{padding:"24px",textAlign:"center",color:"#9ca3af"}}>No products yet</td></tr>}
           </tbody>
         </table>
+        </div>
       </Card>
 
       {variantProducts.length>0&&(
         <>
           <div style={{fontWeight:800,fontSize:14,marginBottom:10}}>Products with Variants</div>
           <Card style={{padding:0,overflow:"hidden"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
+            <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",minWidth:400,borderCollapse:"collapse",fontSize:12.5}}>
               <thead>
                 <tr style={{background:"#f9fafb"}}>
                   <th style={{textAlign:"left",padding:"8px 12px",color:"#6b7280",fontWeight:700}}>Product</th>
@@ -1545,6 +1550,7 @@ function InventoryProfits({products,fmt,primary}){
                 ))}
               </tbody>
             </table>
+            </div>
           </Card>
         </>
       )}
