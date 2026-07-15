@@ -40,35 +40,35 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { customerEmail, customerFirstName, storeName, storePhone, storeAddress, serviceName, resourceName, date, time, bookingId, amount, kind } = req.body || {};
+  const { customerEmail, customerFirstName, storeName, storePhone, storeAddress, serviceName, resourceName, date, time, refCode, amount, bookingNoun, kind } = req.body || {};
   if (!customerEmail || !/\S+@\S+\.\S+/.test(customerEmail)) return res.status(400).json({ error: "Missing or invalid email" });
   if (!serviceName || !date) return res.status(400).json({ error: "Missing booking details" });
 
   const RESEND_KEY = process.env.RESEND_KEY;
   if (!RESEND_KEY) return res.status(500).json({ error: "Email isn't configured" });
 
+  const noun = bookingNoun || "Booking";
   const reschedule = kind === "reschedule";
   const subject = reschedule
-    ? `Your booking has been moved — ${serviceName} on ${fmtDateLabel(date)}`
-    : `Your booking is confirmed — ${serviceName} on ${fmtDateLabel(date)}`;
-  const reference = "BK-" + String(bookingId||"").slice(2, 8).toUpperCase();
+    ? `Your ${noun.toLowerCase()} has been moved — ${serviceName} on ${fmtDateLabel(date)}`
+    : `Your ${noun.toLowerCase()} is confirmed — ${serviceName} on ${fmtDateLabel(date)}`;
 
   const rows = [
     ["Service", serviceName],
     ["Date", fmtDateLabel(date)],
     ...(time ? [["Time", fmtTimeLabel(time)]] : []),
     ...(resourceName ? [["With", resourceName]] : []),
-    ["Reference", reference],
+    [`${noun} Reference`, refCode || ""],
     ...(amount ? [["Amount Paid", fmtPeso(amount)]] : []),
   ];
 
   const html = `<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f9fafb">
     <div style="background:#0d9488;border-radius:12px;padding:20px;text-align:center;margin-bottom:20px">
-      <div style="color:#fff;font-size:20px;font-weight:800">${storeName||"Your booking"}</div>
+      <div style="color:#fff;font-size:20px;font-weight:800">${storeName||`Your ${noun.toLowerCase()}`}</div>
     </div>
     <div style="background:#fff;border-radius:12px;padding:24px;border:1px solid #e5e7eb">
-      <div style="color:#0d9488;font-weight:700;font-size:13px;margin-bottom:10px">${reschedule?"↻ Booking Moved":"✓ Payment Confirmed"}</div>
-      <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 18px">Hi ${customerFirstName||"there"},<br/>${reschedule?"Your appointment has been moved to a new time.":"Your payment has been verified and your booking is now confirmed."}</p>
+      <div style="color:#0d9488;font-weight:700;font-size:13px;margin-bottom:10px">${reschedule?`↻ ${noun} Moved`:"✓ Payment Confirmed"}</div>
+      <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 18px">Hi ${customerFirstName||"there"},<br/>${reschedule?`Your ${noun.toLowerCase()} has been moved to a new time.`:`Your payment has been verified and your ${noun.toLowerCase()} is now confirmed.`}</p>
       <table style="width:100%;border-collapse:collapse;font-size:13px">
         ${rows.map(([label,val])=>`<tr><td style="padding:6px 0;color:#6b7280">${label}</td><td style="padding:6px 0;color:#111;text-align:right;font-weight:700">${val}</td></tr>`).join("")}
       </table>
