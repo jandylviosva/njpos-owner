@@ -67,6 +67,8 @@ export default async function handler(req, res) {
     date: booking.date,
     time: booking.time,
     amount: booking.amount,
+    hourlyRate: booking.hourlyRate || null,
+    durationMinutes: booking.durationMinutes || null,
     paymentSubmitted: !!booking.paymentScreenshotPath,
     bookingNoun: (data.booking_page_settings && data.booking_page_settings.bookingNoun) || "Booking",
     storeName: store.store_name,
