@@ -309,7 +309,7 @@ export default function BookingApp() {
                   <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:6}}>
                     {slots.map(s => {
                       const selected = service.durationMode==="flexible"
-                        ? (rangeStart===s.time || (time && endTime && s.time>=time && s.time<endTime))
+                        ? (rangeStart===s.time || (time && endTime && s.time>=time && s.time<=endTime))
                         : time===s.time;
                       return (
                         <button key={s.time} disabled={s.taken} onClick={() => pickSlot(s.time)}
@@ -321,6 +321,11 @@ export default function BookingApp() {
                   </div>
                   {slots.length===0 && <Empty text="No time slots available that day — try another date."/>}
                   {time && endTime && <div style={{fontSize:12,color:"#6b7280",marginTop:8}}>{fmtTimeLabel(time)} – {fmtTimeLabel(endTime)}</div>}
+                  {time && !endTime && service.durationMode!=="flexible" && (
+                    <div style={{fontSize:12,color:"#6b7280",marginTop:8}}>
+                      {fmtTimeLabel(time)} – {fmtTimeLabel(addMinutes(time, service.durationMinutes || service.slotIncrementMinutes || 30))}
+                    </div>
+                  )}
                 </>
               )}
 
@@ -342,7 +347,7 @@ export default function BookingApp() {
             <>
               <h2 style={{margin:"0 0 4px",fontSize:18}}>Your details</h2>
               <p style={{color:"#6b7280",fontSize:13,margin:"0 0 18px"}}>
-                {service.name} · {fmtDateLabel(date)}{time?` · ${fmtTimeLabel(time)}${endTime?` – ${fmtTimeLabel(endTime)}`:""}`:""}
+                {service.name} · {fmtDateLabel(date)}{time?` · ${fmtTimeLabel(time)} – ${fmtTimeLabel(endTime || addMinutes(time, service.durationMinutes || service.slotIncrementMinutes || 30))}`:""}
               </p>
               <div style={{display:"flex",gap:10}}>
                 <div style={{flex:1}}>
@@ -415,7 +420,7 @@ export default function BookingApp() {
               </div>
               <h2 style={{margin:"0 0 8px",fontSize:20}}>{service?.requiresPayment ? "Payment submitted!" : `Your ${(store.bookingNoun||"booking").toLowerCase()} is confirmed!`}</h2>
               <p style={{color:"#6b7280",fontSize:14,lineHeight:1.6,marginBottom:16}}>
-                {service?.name} on {fmtDateLabel(date)}{time?` at ${fmtTimeLabel(time)}`:""}, for <b>{customerFirstName} {customerLastName}</b>.{" "}
+                {service?.name} on {fmtDateLabel(date)}{time?` at ${fmtTimeLabel(time)}${endTime||service?.durationMode!=="flexible"?` – ${fmtTimeLabel(endTime || addMinutes(time, service?.durationMinutes || service?.slotIncrementMinutes || 30))}`:""}`:""}, for <b>{customerFirstName} {customerLastName}</b>.{" "}
                 {service?.requiresPayment
                   ? `${store.storeName} will review your payment and confirm your ${(store.bookingNoun||"booking").toLowerCase()} shortly.`
                   : (fulfillmentNote || `${store.storeName} may contact you at ${customerPhone} to confirm.`)}
