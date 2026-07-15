@@ -130,6 +130,11 @@ async function sendResendEmail(RESEND_KEY, { to, subject, html }) {
 }
 
 const fmtPeso = (n) => `\u20B1${Number(n || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmtHours = (mins) => { const h = Math.round((mins/60)*10)/10; return h % 1 === 0 ? String(h) : h.toFixed(1); };
+const pricingBreakdown = (hourlyRate, durationMinutes) => {
+  if (!hourlyRate || !durationMinutes) return null;
+  return `${fmtPeso(hourlyRate)}/hr \u00D7 ${fmtHours(durationMinutes)} hr${fmtHours(durationMinutes)==="1"?"":"s"}`;
+};
 const fmtDateLabel = (dateStr) => { try { return new Date(dateStr + "T00:00:00").toLocaleDateString("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric" }); } catch { return dateStr; } };
 const fmtTimeLabel = (t) => { if (!t) return ""; const [h, m] = t.split(":").map(Number); const period = h >= 12 ? "PM" : "AM"; const h12 = h % 12 === 0 ? 12 : h % 12; return `${h12}:${String(m).padStart(2, "0")} ${period}`; };
 
@@ -143,7 +148,7 @@ async function sendCreationEmail({ requiresPayment, booking, storeName, storeAdd
     ...(booking.time ? [["Time", fmtTimeLabel(booking.time)]] : []),
     ...(booking.resourceName ? [["With", booking.resourceName]] : []),
     [`${noun} Reference`, booking.refCode],
-    ...(requiresPayment ? [["Amount Due", fmtPeso(booking.amount)]] : []),
+    ...(requiresPayment ? [["Amount Due", fmtPeso(booking.amount) + (pricingBreakdown(booking.hourlyRate, booking.durationMinutes) ? ` (${pricingBreakdown(booking.hourlyRate, booking.durationMinutes)})` : "")]] : []),
   ];
   const subject = requiresPayment
     ? `Pay your ${noun.toLowerCase()} now — ${booking.serviceName} on ${fmtDateLabel(booking.date)}`
@@ -240,6 +245,7 @@ export default async function handler(req, res) {
       date, time: time || "", endTime: endTime || undefined,
       durationMinutes,
       amount: computeAmount(svc, durationMinutes),
+      hourlyRate: (svc.durationMode === "flexible" && svc.pricingMode === "hourly") ? svc.price : null,
       fulfillmentNote: svc.fulfillmentNote || "",
       status: requiresPayment ? "pending" : "confirmed",
       expiresAt: requiresPayment ? new Date(Date.now() + holdMinutes * 60000).toISOString() : null,
