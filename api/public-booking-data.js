@@ -54,7 +54,7 @@ export default async function handler(req, res) {
 
   const data = await supaGet(
     "store_data",
-    `store_id=eq.${encodeURIComponent(store.id)}&select=enable_bookings,booking_resources,booking_services,bookings,order_settings`
+    `store_id=eq.${encodeURIComponent(store.id)}&select=enable_bookings,booking_resources,booking_services,bookings,order_settings,booking_page_content`
   );
   if (!data || !data.enable_bookings) return res.status(404).json({ error: "not_found" });
 
@@ -76,5 +76,6 @@ export default async function handler(req, res) {
     services: (data.booking_services || []).filter(s => s.active !== false),
     bookings: safeBookings,
     defaultHours: (data.order_settings && data.order_settings.bookingDefaultHours) || DEFAULT_HOURS,
+    pageContent: Array.isArray(data.booking_page_content) ? data.booking_page_content : [],
   });
 }
