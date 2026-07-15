@@ -64,8 +64,16 @@ export default async function handler(req, res) {
 
   // Strip every field except what's needed to compute slot availability.
   // Never forward customerName/customerPhone/notes for other people's bookings.
+  // An expired, never-paid "pending" hold no longer blocks a slot — same
+  // isHeld() rule as create-booking.js, duplicated for the same reason
+  // (isolated serverless function, no shared package).
+  const isHeld = (b) => {
+    if (b.status === "cancelled") return false;
+    if (b.status === "pending" && !b.paymentScreenshotPath && b.expiresAt && new Date(b.expiresAt).getTime() < Date.now()) return false;
+    return true;
+  };
   const safeBookings = (data.bookings || [])
-    .filter(b => b.status !== "cancelled" && b.date >= cutoffKey)
+    .filter(b => isHeld(b) && b.date >= cutoffKey)
     .map(b => ({ id: b.id, resourceId: b.resourceId || null, date: b.date, time: b.time || null, durationMinutes: b.durationMinutes || null }));
 
   return res.status(200).json({
@@ -79,5 +87,11 @@ export default async function handler(req, res) {
     pageContent: Array.isArray(data.booking_page_content) ? data.booking_page_content : [],
     tagline: (data.booking_page_settings && data.booking_page_settings.tagline) || "Book an appointment",
     logoUrl: (data.business_details?.useStoreLogo !== false) ? ((data.theme && data.theme.logoUrl) || (data.business_details && data.business_details.logoUrl) || "") : "",
+    storePhone: (data.business_details && data.business_details.phone) || "",
+    gcash: {
+      name: (data.booking_page_settings && data.booking_page_settings.gcashName) || "",
+      number: (data.booking_page_settings && data.booking_page_settings.gcashNumber) || "",
+      qrUrl: (data.booking_page_settings && data.booking_page_settings.gcashQrUrl) || "",
+    },
   });
 }
