@@ -1,6 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 
 const fmtPeso = (n) => `\u20B1\u200A${Number(n||0).toLocaleString("en-PH",{minimumFractionDigits:0,maximumFractionDigits:2})}`;
+const fmtHours = (mins) => { const h = Math.round((mins/60)*10)/10; return h % 1 === 0 ? String(h) : h.toFixed(1); };
+const pricingBreakdown = (hourlyRate, durationMinutes) => {
+  if (!hourlyRate || !durationMinutes) return null;
+  return `${fmtPeso(hourlyRate)}/hr \u00D7 ${fmtHours(durationMinutes)} hr${fmtHours(durationMinutes)==="1"?"":"s"}`;
+};
 const fmtDateLabel = (dateStr) => dateStr ? new Date(dateStr+"T00:00:00").toLocaleDateString("en-PH",{weekday:"short",month:"short",day:"numeric"}) : "";
 const fmtTimeLabel = (t) => { if(!t) return ""; const [h,m]=t.split(":").map(Number); const period=h>=12?"PM":"AM"; const h12=h%12===0?12:h%12; return `${h12}:${String(m).padStart(2,"0")} ${period}`; };
 
@@ -126,6 +131,9 @@ export default function BookingPayApp() {
                   <div style={{background:"#f0fdfa",border:"1px solid #99f6e4",borderRadius:12,padding:16,textAlign:"center",marginBottom:18}}>
                     <div style={{fontSize:12,color:"#0d9488",fontWeight:700,marginBottom:4}}>Amount to send</div>
                     <div style={{fontSize:26,fontWeight:800,color:"#111"}}>{fmtPeso(booking.amount)}</div>
+                    {pricingBreakdown(booking.hourlyRate, booking.durationMinutes) && (
+                      <div style={{fontSize:12,color:"#0d9488",marginTop:4}}>{pricingBreakdown(booking.hourlyRate, booking.durationMinutes)}</div>
+                    )}
                   </div>
                   {booking.gcash?.qrUrl && <img src={booking.gcash.qrUrl} alt="GCash QR code" style={{width:"100%",maxWidth:220,display:"block",margin:"0 auto 14px",borderRadius:10}}/>}
                   {(booking.gcash?.name || booking.gcash?.number) && (
