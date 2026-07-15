@@ -10,6 +10,8 @@ const ALLOWED_ORIGINS = [
   "https://pospro-portal.vercel.app",
   "https://www.pospro-portal.com",
   "https://pospro-portal.com",
+  "https://client.pospro-portal.com",
+  "https://pwa.pospro-portal.com",
 ];
 
 function setCorsHeaders(req, res) {
