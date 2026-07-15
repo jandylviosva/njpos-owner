@@ -43,7 +43,7 @@ const hasBookingConflict = (bookings, resourceId, date, time, durationMinutes) =
   });
 };
 const toLocalDateKey = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-const fmtPeso = (n) => `₱${Number(n||0).toLocaleString("en-PH",{minimumFractionDigits:0,maximumFractionDigits:2})}`;
+const fmtPeso = (n) => `\u20B1\u200A${Number(n||0).toLocaleString("en-PH",{minimumFractionDigits:0,maximumFractionDigits:2})}`;
 const fmtDateLabel = (dateStr) => new Date(dateStr+"T00:00:00").toLocaleDateString("en-PH",{weekday:"short",month:"short",day:"numeric"});
 const fmtTimeLabel = (t) => {
   const [h,m] = t.split(":").map(Number);
@@ -179,7 +179,7 @@ export default function BookingApp() {
             <img src="/icons/icon-192.png" alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
           </div>
           <div style={{fontSize:20,fontWeight:800,color:"#111"}}>{store.storeName}</div>
-          <div style={{fontSize:13,color:"#0d9488",fontWeight:700,marginTop:2}}>Book an appointment</div>
+          <div style={{fontSize:13,color:"#0d9488",fontWeight:700,marginTop:2}}>{store.tagline}</div>
         </div>
 
         <div style={{background:"#fff",borderRadius:18,padding:"26px 24px",boxShadow:"0 4px 24px rgba(0,0,0,0.06)"}}>
@@ -332,12 +332,15 @@ function PageContentBlocks({blocks}) {
           </div>
         );
         // richtext (default/fallback)
-        return (
-          <div key={b.id}>
-            {b.heading && <div style={{fontWeight:800,fontSize:16,color:"#111",marginBottom:6}}>{b.heading}</div>}
-            <div style={{fontSize:13,color:"#6b7280",lineHeight:1.7,whiteSpace:"pre-wrap"}}>{b.body}</div>
-          </div>
-        );
+        {
+          const sizes = {sm:{h:14,b:12},md:{h:16,b:13},lg:{h:20,b:15}}[b.fontSize||"md"];
+          return (
+            <div key={b.id} style={{textAlign:b.align||"left"}}>
+              {b.heading && <div style={{fontWeight:800,fontSize:sizes.h,color:b.color||"#111",marginBottom:6}}>{b.heading}</div>}
+              <div style={{fontSize:sizes.b,color:b.color||"#6b7280",lineHeight:1.7,whiteSpace:"pre-wrap"}}>{b.body}</div>
+            </div>
+          );
+        }
       })}
     </div>
   );
