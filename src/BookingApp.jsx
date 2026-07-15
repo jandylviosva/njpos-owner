@@ -75,10 +75,17 @@ export default function BookingApp() {
   const [endTime, setEndTime] = useState(null);
   const [rangeStart, setRangeStart] = useState(null); // first tap of a 2-tap range select
 
-  const [customerName, setCustomerName] = useState("");
+  const [customerFirstName, setCustomerFirstName] = useState("");
+  const [customerLastName, setCustomerLastName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const [bookingId, setBookingId] = useState(null);
+  const [amountDue, setAmountDue] = useState(0);
+  const [screenshotFile, setScreenshotFile] = useState(null);
+  const [screenshotPreview, setScreenshotPreview] = useState(null);
 
   useEffect(() => {
     if (!slug) { setPhase("notfound"); return; }
@@ -133,16 +140,21 @@ export default function BookingApp() {
 
   const canSubmitSchedule = date && (!service.exclusivity || (time && (service.durationMode !== "flexible" || endTime)));
 
-  const submitBooking = async () => {
+  const createBooking = async () => {
     setError("");
-    if (!customerName.trim()) { setError("Enter your name"); return; }
+    if (!customerFirstName.trim()) { setError("Enter your first name"); return; }
+    if (!customerLastName.trim()) { setError("Enter your last name"); return; }
     if (!customerPhone.trim()) { setError("Enter a phone number so the store can reach you"); return; }
     setSubmitting(true);
     try {
       const res = await fetch(`${API_BASE}/api/create-booking`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, serviceId, resourceId, date, time, endTime, customerName: customerName.trim(), customerPhone: customerPhone.trim(), notes }),
+        body: JSON.stringify({
+          slug, serviceId, resourceId, date, time, endTime,
+          customerFirstName: customerFirstName.trim(), customerLastName: customerLastName.trim(),
+          customerPhone: customerPhone.trim(), customerEmail: customerEmail.trim(), notes,
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
@@ -152,6 +164,35 @@ export default function BookingApp() {
         setSubmitting(false);
         return;
       }
+      setBookingId(data.bookingId);
+      setAmountDue(data.amount || 0);
+      setStep(data.requiresPayment ? "payment" : "done");
+    } catch {
+      setError("Couldn't reach the server. Check your connection and try again.");
+    }
+    setSubmitting(false);
+  };
+
+  const pickScreenshot = (file) => {
+    if (!file) return;
+    setScreenshotFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setScreenshotPreview(reader.result);
+    reader.readAsDataURL(file);
+  };
+
+  const submitPayment = async () => {
+    setError("");
+    if (!screenshotPreview) { setError("Upload your GCash payment screenshot"); return; }
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/submit-booking-payment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug, bookingId, screenshotBase64: screenshotPreview }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) { setError(data.error || "Something went wrong. Please try again."); setSubmitting(false); return; }
       setStep("done");
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");
@@ -183,7 +224,7 @@ export default function BookingApp() {
         </div>
 
         <div style={{background:"#fff",borderRadius:18,padding:"26px 24px",boxShadow:"0 4px 24px rgba(0,0,0,0.06)"}}>
-          {step !== "done" && step !== "service" && (
+          {step !== "done" && step !== "service" && step !== "payment" && (
             <button onClick={() => setStep(step==="details"?"schedule":step==="schedule"&&service?.resourceRequired?"resource":"service")}
               style={{background:"none",border:"none",color:"#0d9488",fontSize:13,fontWeight:700,cursor:"pointer",padding:0,marginBottom:16,display:"flex",alignItems:"center",gap:4}}>
               <i className="ti ti-chevron-left"/> Back
@@ -262,6 +303,13 @@ export default function BookingApp() {
                 </>
               )}
 
+              {store.storePhone && (
+                <div style={{fontSize:12,color:"#9ca3af",marginTop:16}}>
+                  Can't find a time that works?{" "}
+                  <a href={`tel:${store.storePhone}`} style={{color:"#0d9488",fontWeight:700,textDecoration:"none"}}>Call us: {store.storePhone}</a>
+                </div>
+              )}
+
               <button disabled={!canSubmitSchedule} onClick={() => setStep("details")}
                 style={{width:"100%",marginTop:22,padding:"13px 0",background:canSubmitSchedule?"#0d9488":"#d1fae5",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:canSubmitSchedule?"pointer":"not-allowed"}}>
                 Continue
@@ -275,18 +323,62 @@ export default function BookingApp() {
               <p style={{color:"#6b7280",fontSize:13,margin:"0 0 18px"}}>
                 {service.name} · {fmtDateLabel(date)}{time?` · ${fmtTimeLabel(time)}${endTime?` – ${fmtTimeLabel(endTime)}`:""}`:""}
               </p>
-              <label style={LBL}>Full Name</label>
-              <input value={customerName} onChange={e=>setCustomerName(e.target.value)} style={INP} placeholder="Juan Dela Cruz"/>
+              <div style={{display:"flex",gap:10}}>
+                <div style={{flex:1}}>
+                  <label style={LBL}>First Name</label>
+                  <input value={customerFirstName} onChange={e=>setCustomerFirstName(e.target.value)} style={INP} placeholder="Juan"/>
+                </div>
+                <div style={{flex:1}}>
+                  <label style={LBL}>Last Name</label>
+                  <input value={customerLastName} onChange={e=>setCustomerLastName(e.target.value)} style={INP} placeholder="Dela Cruz"/>
+                </div>
+              </div>
               <label style={LBL}>Phone Number</label>
               <input value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)} style={INP} placeholder="09XX XXX XXXX"/>
+              <label style={LBL}>Email (optional)</label>
+              <input value={customerEmail} onChange={e=>setCustomerEmail(e.target.value)} style={INP} placeholder="For your booking confirmation"/>
               <label style={LBL}>Notes (optional)</label>
               <input value={notes} onChange={e=>setNotes(e.target.value)} style={INP} placeholder="Anything the store should know"/>
 
               {error && <div style={{marginTop:14,padding:"10px 14px",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,color:"#b91c1c",fontSize:13}}>{error}</div>}
 
-              <button onClick={submitBooking} disabled={submitting}
+              <button onClick={createBooking} disabled={submitting}
                 style={{width:"100%",marginTop:20,padding:"13px 0",background:"#0d9488",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:"pointer",opacity:submitting?0.7:1}}>
-                {submitting ? "Booking…" : "Confirm Booking"}
+                {submitting ? "Booking…" : (service.requiresPayment ? "Continue to Payment" : "Confirm Booking")}
+              </button>
+            </>
+          )}
+
+          {step === "payment" && (
+            <>
+              <h2 style={{margin:"0 0 4px",fontSize:18}}>Pay with GCash</h2>
+              <p style={{color:"#6b7280",fontSize:13,margin:"0 0 18px"}}>Your slot is held for a short while — send the exact amount below and upload your screenshot to confirm.</p>
+
+              <div style={{background:"#f0fdfa",border:"1px solid #99f6e4",borderRadius:12,padding:16,textAlign:"center",marginBottom:18}}>
+                <div style={{fontSize:12,color:"#0d9488",fontWeight:700,marginBottom:4}}>Amount to send</div>
+                <div style={{fontSize:26,fontWeight:800,color:"#111"}}>{fmtPeso(amountDue)}</div>
+              </div>
+
+              {store.gcash?.qrUrl && <img src={store.gcash.qrUrl} alt="GCash QR code" style={{width:"100%",maxWidth:220,display:"block",margin:"0 auto 14px",borderRadius:10}}/>}
+              {(store.gcash?.name || store.gcash?.number) && (
+                <div style={{textAlign:"center",fontSize:13,marginBottom:20}}>
+                  {store.gcash?.name && <div style={{fontWeight:700,color:"#111"}}>{store.gcash.name}</div>}
+                  {store.gcash?.number && <div style={{color:"#6b7280"}}>{store.gcash.number}</div>}
+                </div>
+              )}
+              {!store.gcash?.qrUrl && !store.gcash?.number && (
+                <div style={{textAlign:"center",fontSize:13,color:"#b91c1c",marginBottom:20}}>This store hasn't set up their GCash details yet — please contact them directly to complete payment.</div>
+              )}
+
+              <label style={LBL}>Upload payment screenshot</label>
+              {screenshotPreview && <img src={screenshotPreview} alt="" style={{width:"100%",borderRadius:10,marginTop:8,marginBottom:8}}/>}
+              <input type="file" accept="image/*" onChange={e=>pickScreenshot(e.target.files?.[0])} style={{fontSize:12,marginTop:4}}/>
+
+              {error && <div style={{marginTop:14,padding:"10px 14px",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,color:"#b91c1c",fontSize:13}}>{error}</div>}
+
+              <button onClick={submitPayment} disabled={submitting || !screenshotPreview}
+                style={{width:"100%",marginTop:20,padding:"13px 0",background:screenshotPreview?"#0d9488":"#d1fae5",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:screenshotPreview?"pointer":"not-allowed",opacity:submitting?0.7:1}}>
+                {submitting ? "Submitting…" : "Submit Payment"}
               </button>
             </>
           )}
@@ -294,12 +386,14 @@ export default function BookingApp() {
           {step === "done" && (
             <div style={{textAlign:"center",padding:"10px 0"}}>
               <div style={{width:64,height:64,borderRadius:"50%",background:"#f0fdfa",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 18px"}}>
-                <i className="ti ti-check" style={{fontSize:32,color:"#0d9488"}}/>
+                <i className={`ti ${service?.requiresPayment?"ti-clock":"ti-check"}`} style={{fontSize:32,color:"#0d9488"}}/>
               </div>
-              <h2 style={{margin:"0 0 8px",fontSize:20}}>You're booked!</h2>
+              <h2 style={{margin:"0 0 8px",fontSize:20}}>{service?.requiresPayment ? "Payment submitted!" : "You're booked!"}</h2>
               <p style={{color:"#6b7280",fontSize:14,lineHeight:1.6}}>
-                {service?.name} on {fmtDateLabel(date)}{time?` at ${fmtTimeLabel(time)}`:""}, for <b>{customerName}</b>.{" "}
-                {store.storeName} may contact you at {customerPhone} to confirm.
+                {service?.name} on {fmtDateLabel(date)}{time?` at ${fmtTimeLabel(time)}`:""}, for <b>{customerFirstName} {customerLastName}</b>.{" "}
+                {service?.requiresPayment
+                  ? `${store.storeName} will review your payment and confirm your booking shortly.`
+                  : `${store.storeName} may contact you at ${customerPhone} to confirm.`}
               </p>
             </div>
           )}
