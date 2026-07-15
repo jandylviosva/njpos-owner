@@ -142,8 +142,13 @@ export default function BookingApp() {
   const pickSlot = (t) => {
     if (service.durationMode !== "flexible") { setTime(t); setEndTime(null); return; }
     if (!rangeStart) { setRangeStart(t); setTime(t); setEndTime(null); return; }
-    const start = rangeStart <= t ? rangeStart : t;
-    const end = addMinutes(rangeStart <= t ? t : rangeStart, service.slotIncrementMinutes || 30);
+    if (t === rangeStart) {
+      // Tapped the same slot twice — treat it as "just this one slot's length."
+      setTime(t); setEndTime(addMinutes(t, service.slotIncrementMinutes || 30)); setRangeStart(null);
+      return;
+    }
+    const start = rangeStart < t ? rangeStart : t;
+    const end = rangeStart < t ? t : rangeStart;
     setTime(start); setEndTime(end); setRangeStart(null);
   };
 
