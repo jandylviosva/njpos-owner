@@ -32,6 +32,11 @@ async function sendResendEmail(RESEND_KEY, { to, subject, html }) {
 }
 
 const fmtPeso = (n) => `\u20B1${Number(n||0).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+const fmtHours = (mins) => { const h = Math.round((mins/60)*10)/10; return h % 1 === 0 ? String(h) : h.toFixed(1); };
+const pricingBreakdown = (hourlyRate, durationMinutes) => {
+  if (!hourlyRate || !durationMinutes) return null;
+  return `${fmtPeso(hourlyRate)}/hr \u00D7 ${fmtHours(durationMinutes)} hr${fmtHours(durationMinutes)==="1"?"":"s"}`;
+};
 const fmtDateLabel = (dateStr) => { try { return new Date(dateStr+"T00:00:00").toLocaleDateString("en-PH",{weekday:"long",month:"long",day:"numeric",year:"numeric"}); } catch { return dateStr; } };
 const fmtTimeLabel = (t) => { if(!t) return ""; const [h,m]=t.split(":").map(Number); const period=h>=12?"PM":"AM"; const h12=h%12===0?12:h%12; return `${h12}:${String(m).padStart(2,"0")} ${period}`; };
 
@@ -40,7 +45,7 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { customerEmail, customerFirstName, storeName, storePhone, storeAddress, serviceName, resourceName, date, time, refCode, amount, bookingNoun, kind } = req.body || {};
+  const { customerEmail, customerFirstName, storeName, storePhone, storeAddress, serviceName, resourceName, date, time, refCode, amount, hourlyRate, durationMinutes, bookingNoun, kind } = req.body || {};
   if (!customerEmail || !/\S+@\S+\.\S+/.test(customerEmail)) return res.status(400).json({ error: "Missing or invalid email" });
   if (!serviceName || !date) return res.status(400).json({ error: "Missing booking details" });
 
@@ -59,7 +64,7 @@ export default async function handler(req, res) {
     ...(time ? [["Time", fmtTimeLabel(time)]] : []),
     ...(resourceName ? [["With", resourceName]] : []),
     [`${noun} Reference`, refCode || ""],
-    ...(amount ? [["Amount Paid", fmtPeso(amount)]] : []),
+    ...(amount ? [["Amount Paid", fmtPeso(amount) + (pricingBreakdown(hourlyRate, durationMinutes) ? ` (${pricingBreakdown(hourlyRate, durationMinutes)})` : "")]] : []),
   ];
 
   const html = `<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f9fafb">
