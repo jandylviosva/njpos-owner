@@ -304,7 +304,41 @@ export default function BookingApp() {
             </div>
           )}
         </div>
+        {store.pageContent?.length > 0 && <PageContentBlocks blocks={store.pageContent}/>}
       </div>
+    </div>
+  );
+}
+
+function PageContentBlocks({blocks}) {
+  return (
+    <div style={{marginTop:28,display:"flex",flexDirection:"column",gap:22}}>
+      {blocks.map(b => {
+        if (b.type === "divider") return <div key={b.id} style={{height:1,background:"#e5e7eb"}}/>;
+        if (b.type === "image") return (
+          <figure key={b.id} style={{margin:0}}>
+            <img src={b.url} alt={b.caption||""} style={{width:"100%",borderRadius:14,display:"block"}}/>
+            {b.caption && <figcaption style={{fontSize:12,color:"#9ca3af",marginTop:6,textAlign:"center"}}>{b.caption}</figcaption>}
+          </figure>
+        );
+        if (b.type === "columns") return (
+          <div key={b.id} style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:18}}>
+            {(b.columns||[]).map((c,i) => (
+              <div key={i}>
+                {c.heading && <div style={{fontWeight:700,fontSize:14,color:"#111",marginBottom:6}}>{c.heading}</div>}
+                <div style={{fontSize:13,color:"#6b7280",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{c.body}</div>
+              </div>
+            ))}
+          </div>
+        );
+        // richtext (default/fallback)
+        return (
+          <div key={b.id}>
+            {b.heading && <div style={{fontWeight:800,fontSize:16,color:"#111",marginBottom:6}}>{b.heading}</div>}
+            <div style={{fontSize:13,color:"#6b7280",lineHeight:1.7,whiteSpace:"pre-wrap"}}>{b.body}</div>
+          </div>
+        );
+      })}
     </div>
   );
 }
