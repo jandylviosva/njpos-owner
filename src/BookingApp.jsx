@@ -123,10 +123,6 @@ export default function BookingApp() {
     }));
   }, [service, date, resource, resourceId, store]);
 
-  const goToSchedule = () => {
-    setStep(service?.resourceRequired ? "resource" : "schedule");
-  };
-
   const pickSlot = (t) => {
     if (service.durationMode !== "flexible") { setTime(t); setEndTime(null); return; }
     if (!rangeStart) { setRangeStart(t); setTime(t); setEndTime(null); return; }
@@ -152,6 +148,7 @@ export default function BookingApp() {
       if (!res.ok || !data.ok) {
         setError(data.error || "Something went wrong. Please try again.");
         if (res.status === 409) { setStep("schedule"); setTime(null); setEndTime(null); } // slot taken — send them back to pick again
+        else if (data.error === "Please select a resource") { setStep("resource"); } // defense-in-depth, shouldn't hit now that the click-through bug is fixed
         setSubmitting(false);
         return;
       }
@@ -199,7 +196,7 @@ export default function BookingApp() {
               {store.services.length === 0 && <Empty text="No services are available for booking right now."/>}
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 {store.services.map(s => (
-                  <button key={s.id} onClick={() => { setServiceId(s.id); setResourceId(null); setDate(null); setTime(null); setEndTime(null); goToSchedule(); }}
+                  <button key={s.id} onClick={() => { setServiceId(s.id); setResourceId(null); setDate(null); setTime(null); setEndTime(null); setStep(s.resourceRequired ? "resource" : "schedule"); }}
                     style={{textAlign:"left",padding:"14px 16px",border:"1px solid #e5e7eb",borderRadius:12,background:"#fff",cursor:"pointer"}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
                       <div style={{fontWeight:700,fontSize:14,color:"#111"}}>{s.name}</div>
@@ -301,7 +298,7 @@ export default function BookingApp() {
               </div>
               <h2 style={{margin:"0 0 8px",fontSize:20}}>You're booked!</h2>
               <p style={{color:"#6b7280",fontSize:14,lineHeight:1.6}}>
-                {service?.name} on {fmtDateLabel(date)}{time?` at ${fmtTimeLabel(time)}`:""}, for <b>{customerName}</b>.
+                {service?.name} on {fmtDateLabel(date)}{time?` at ${fmtTimeLabel(time)}`:""}, for <b>{customerName}</b>.{" "}
                 {store.storeName} may contact you at {customerPhone} to confirm.
               </p>
             </div>
