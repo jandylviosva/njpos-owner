@@ -176,7 +176,7 @@ export default function BookingApp() {
       <div style={{maxWidth:520,margin:"0 auto"}}>
         <div style={{textAlign:"center",marginBottom:24}}>
           <div style={{width:52,height:52,borderRadius:14,overflow:"hidden",margin:"0 auto 10px"}}>
-            <img src="/icons/icon-192.png" alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+            <img src={store.logoUrl || "/icons/icon-192.png"} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
           </div>
           <div style={{fontSize:20,fontWeight:800,color:"#111"}}>{store.storeName}</div>
           <div style={{fontSize:13,color:"#0d9488",fontWeight:700,marginTop:2}}>{store.tagline}</div>
