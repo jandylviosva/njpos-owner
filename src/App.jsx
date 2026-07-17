@@ -547,8 +547,9 @@ function LoginScreen({onLogin}){
       <div style={{width:"100%",maxWidth:400}}>
         <div style={{textAlign:"center",marginBottom:24}}>
           <div style={{width:66,height:66,borderRadius:18,overflow:"hidden",margin:"0 auto 12px",boxShadow:"0 8px 32px rgba(37,99,235,0.5)"}}><img src="/icons/icon-192.png" alt="NJ POS" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:18}}/></div>
-          <div style={{fontSize:24,fontWeight:800,color:"#fff"}}>NJ POS</div>
-          <div style={{fontSize:12,color:"rgba(255,255,255,0.45)",marginTop:3}}>Owner Portal</div>
+          <div style={{fontFamily:"'Michroma',sans-serif",fontSize:22,letterSpacing:1}}><span style={{color:"#60A5FA"}}>NJ</span><span style={{color:"#fff"}}>POS</span></div>
+          <div style={{fontFamily:"'Poppins',sans-serif",fontWeight:500,fontSize:10,color:"rgba(255,255,255,0.45)",marginTop:6,letterSpacing:0.5}}>SMART POS. BETTER BUSINESS.</div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,0.45)",marginTop:6}}>Owner Portal</div>
         </div>
         <div style={{background:"#fff",borderRadius:20,padding:"28px 28px 24px",boxShadow:"0 24px 60px rgba(0,0,0,0.4)"}}>
           {screen==="email"&&(<>
