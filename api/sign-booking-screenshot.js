@@ -6,18 +6,18 @@
 // (signScreenshotPath / get_screenshot_url in dev-action.js).
 
 const ALLOWED_ORIGINS = [
-  "https://pospro-portal.vercel.app",
-  "https://www.pospro-portal.com",
-  "https://pospro-portal.com",
-  "https://client.pospro-portal.com",
-  "https://pwa.pospro-portal.com",
+  "https://owner.nj-systems.com",
+  "https://pos.nj-systems.com",
+  "https://dev.nj-systems.com",
+  "https://nj-systems.com",
+  "https://www.nj-systems.com",
 ];
 
 function setCorsHeaders(req, res) {
   const origin = req.headers.origin || "";
   const allowed =
     ALLOWED_ORIGINS.includes(origin) ||
-    /^https:\/\/pospro(-portal|-pwa)?(-[a-z0-9]+)?\.vercel\.app$/.test(origin);
+    /^https:\/\/njpos(-portal|-owner|-pwa|-dev|-landing)?(-[a-z0-9]+)?\.vercel\.app$/.test(origin);
   if (allowed) res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");

@@ -77,11 +77,11 @@ export default function BookingPayApp() {
   const noun = booking?.bookingNoun || "Booking";
 
   return (
-    <div style={{minHeight:"100vh",boxSizing:"border-box",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",padding:"40px 16px",background:"#f1f8f6"}}>
+    <div style={{minHeight:"100vh",boxSizing:"border-box",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",padding:"40px 16px",background:"#EFF6FF"}}>
       <div style={{maxWidth:440,margin:"0 auto"}}>
         <div style={{textAlign:"center",marginBottom:24}}>
           <div style={{fontSize:20,fontWeight:800,color:"#111"}}>{booking?.storeName || "Pay My " + noun}</div>
-          <div style={{fontSize:13,color:"#0d9488",fontWeight:700,marginTop:2}}>Find and pay your {noun.toLowerCase()}</div>
+          <div style={{fontSize:13,color:"#2563EB",fontWeight:700,marginTop:2}}>Find and pay your {noun.toLowerCase()}</div>
         </div>
 
         <div style={{background:"#fff",borderRadius:18,padding:"26px 24px",boxShadow:"0 4px 24px rgba(0,0,0,0.06)"}}>
@@ -94,7 +94,7 @@ export default function BookingPayApp() {
               <label style={LBL}>Phone Number</label>
               <input value={phone} onChange={e=>setPhone(e.target.value)} style={INP} placeholder="09XX XXX XXXX"/>
               {error && <div style={{marginTop:14,padding:"10px 14px",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,color:"#b91c1c",fontSize:13}}>{error}</div>}
-              <button onClick={lookup} disabled={looking} style={{width:"100%",marginTop:20,padding:"13px 0",background:"#0d9488",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:"pointer",opacity:looking?0.7:1}}>
+              <button onClick={lookup} disabled={looking} style={{width:"100%",marginTop:20,padding:"13px 0",background:"#2563EB",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:"pointer",opacity:looking?0.7:1}}>
                 {looking ? "Looking…" : "Find My " + noun}
               </button>
             </>
@@ -108,8 +108,8 @@ export default function BookingPayApp() {
 
               {booking.status === "confirmed" && (
                 <div style={{textAlign:"center",padding:"10px 0"}}>
-                  <div style={{width:56,height:56,borderRadius:"50%",background:"#f0fdfa",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}>
-                    <i className="ti ti-check" style={{fontSize:28,color:"#0d9488"}}/>
+                  <div style={{width:56,height:56,borderRadius:"50%",background:"#EFF6FF",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}>
+                    <i className="ti ti-check" style={{fontSize:28,color:"#2563EB"}}/>
                   </div>
                   <h2 style={{margin:"0 0 6px",fontSize:18}}>You're all set!</h2>
                   <p style={{color:"#6b7280",fontSize:13}}>This {noun.toLowerCase()} is confirmed. No payment needed.</p>
@@ -128,11 +128,11 @@ export default function BookingPayApp() {
 
               {booking.status === "pending" && !booking.paymentSubmitted && !justSubmitted && (
                 <>
-                  <div style={{background:"#f0fdfa",border:"1px solid #99f6e4",borderRadius:12,padding:16,textAlign:"center",marginBottom:18}}>
-                    <div style={{fontSize:12,color:"#0d9488",fontWeight:700,marginBottom:4}}>Amount to send</div>
+                  <div style={{background:"#EFF6FF",border:"1px solid #BFDBFE",borderRadius:12,padding:16,textAlign:"center",marginBottom:18}}>
+                    <div style={{fontSize:12,color:"#2563EB",fontWeight:700,marginBottom:4}}>Amount to send</div>
                     <div style={{fontSize:26,fontWeight:800,color:"#111"}}>{fmtPeso(booking.amount)}</div>
                     {pricingBreakdown(booking.hourlyRate, booking.durationMinutes) && (
-                      <div style={{fontSize:12,color:"#0d9488",marginTop:4}}>{pricingBreakdown(booking.hourlyRate, booking.durationMinutes)}</div>
+                      <div style={{fontSize:12,color:"#2563EB",marginTop:4}}>{pricingBreakdown(booking.hourlyRate, booking.durationMinutes)}</div>
                     )}
                   </div>
                   {booking.gcash?.qrUrl && <img src={booking.gcash.qrUrl} alt="GCash QR code" style={{width:"100%",maxWidth:220,display:"block",margin:"0 auto 14px",borderRadius:10}}/>}
@@ -147,7 +147,7 @@ export default function BookingPayApp() {
                   <input type="file" accept="image/*" onChange={e=>pickScreenshot(e.target.files?.[0])} style={{fontSize:12,marginTop:4}}/>
                   {error && <div style={{marginTop:14,padding:"10px 14px",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,color:"#b91c1c",fontSize:13}}>{error}</div>}
                   <button onClick={submitPayment} disabled={submitting || !screenshotPreview}
-                    style={{width:"100%",marginTop:20,padding:"13px 0",background:screenshotPreview?"#0d9488":"#d1fae5",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:screenshotPreview?"pointer":"not-allowed",opacity:submitting?0.7:1}}>
+                    style={{width:"100%",marginTop:20,padding:"13px 0",background:screenshotPreview?"#2563EB":"#BFDBFE",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:screenshotPreview?"pointer":"not-allowed",opacity:submitting?0.7:1}}>
                     {submitting ? "Submitting…" : "Submit Payment"}
                   </button>
                 </>

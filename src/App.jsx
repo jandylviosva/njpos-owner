@@ -170,7 +170,7 @@ function SectionTitle({children}){return<div style={{fontWeight:800,fontSize:14,
 function FRow({label,children,hint}){return<div><label style={LBL}>{label}{hint&&<span style={{fontSize:10,color:"#9ca3af",marginLeft:6,textTransform:"none",letterSpacing:0}}>{hint}</span>}</label><div style={{marginTop:5}}>{children}</div></div>;}
 function Err({msg}){if(!msg)return null;return<div style={{marginTop:10,padding:"9px 12px",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,fontSize:13,color:"#991b1b",display:"flex",alignItems:"center",gap:7}}><i className="ti ti-alert-circle" style={{fontSize:15,flexShrink:0}}/>{msg}</div>;}
 function Ok({msg}){if(!msg)return null;return<div style={{marginTop:10,padding:"9px 12px",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:8,fontSize:13,color:"#166534",display:"flex",alignItems:"center",gap:7}}><i className="ti ti-check" style={{fontSize:15,flexShrink:0}}/>{msg}</div>;}
-function Toggle({checked,onChange,label}){return<label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}}><div onClick={()=>onChange(!checked)} style={{width:40,height:22,borderRadius:11,background:checked?"#4f46e5":"#d1d5db",position:"relative",transition:"background 0.2s",flexShrink:0,cursor:"pointer"}}><div style={{width:18,height:18,borderRadius:"50%",background:"#fff",position:"absolute",top:2,left:checked?20:2,transition:"left 0.2s",boxShadow:"0 1px 3px rgba(0,0,0,0.2)"}}/></div>{label&&<span style={{fontSize:13,fontWeight:600,color:"#374151"}}>{label}</span>}</label>;}
+function Toggle({checked,onChange,label}){return<label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}}><div onClick={()=>onChange(!checked)} style={{width:40,height:22,borderRadius:11,background:checked?"#2563EB":"#d1d5db",position:"relative",transition:"background 0.2s",flexShrink:0,cursor:"pointer"}}><div style={{width:18,height:18,borderRadius:"50%",background:"#fff",position:"absolute",top:2,left:checked?20:2,transition:"left 0.2s",boxShadow:"0 1px 3px rgba(0,0,0,0.2)"}}/></div>{label&&<span style={{fontSize:13,fontWeight:600,color:"#374151"}}>{label}</span>}</label>;}
 
 // ════════════════════════════════════════════════════════
 // PRODUCT SEARCH SELECT — type-to-filter dropdown for inclusions.
@@ -247,7 +247,7 @@ function ProductSearchSelect({products, value, onSelect, placeholder, excludeId}
 
 function printReport(html,title){
   const win=window.open("","_blank","width=900,height=700");if(!win)return;
-  win.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:12px;padding:20px;color:#111}h1{font-size:18px;font-weight:800;margin-bottom:4px}h2{font-size:13px;font-weight:700;margin:16px 0 8px;color:#4f46e5;border-bottom:2px solid #4f46e5;padding-bottom:4px}.meta{font-size:11px;color:#6b7280;margin-bottom:16px}table{width:100%;border-collapse:collapse;margin-bottom:16px}th{background:#f3f4f6;padding:6px 8px;text-align:left;font-weight:700;font-size:11px;color:#6b7280;text-transform:uppercase;border-bottom:2px solid #e5e7eb}td{padding:6px 8px;border-bottom:1px solid #f3f4f6}.right{text-align:right}.bold{font-weight:800}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}.card{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px}.card-label{font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px}.card-val{font-size:20px;font-weight:800;color:#4f46e5;margin-top:4px}.green{color:#166534}.red{color:#991b1b}@media print{button{display:none!important}}</style></head><body>${html}<div style="margin-top:24px;text-align:right"><button onclick="window.print()" style="padding:10px 22px;background:#4f46e5;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:800">Print</button><button onclick="window.close()" style="padding:10px 22px;background:#f3f4f6;color:#374151;border:none;border-radius:8px;cursor:pointer;font-size:14px;margin-left:8px">Close</button></div></body></html>`);
+  win.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:12px;padding:20px;color:#111}h1{font-size:18px;font-weight:800;margin-bottom:4px}h2{font-size:13px;font-weight:700;margin:16px 0 8px;color:#2563EB;border-bottom:2px solid #2563EB;padding-bottom:4px}.meta{font-size:11px;color:#6b7280;margin-bottom:16px}table{width:100%;border-collapse:collapse;margin-bottom:16px}th{background:#f3f4f6;padding:6px 8px;text-align:left;font-weight:700;font-size:11px;color:#6b7280;text-transform:uppercase;border-bottom:2px solid #e5e7eb}td{padding:6px 8px;border-bottom:1px solid #f3f4f6}.right{text-align:right}.bold{font-weight:800}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}.card{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px}.card-label{font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px}.card-val{font-size:20px;font-weight:800;color:#2563EB;margin-top:4px}.green{color:#166534}.red{color:#991b1b}@media print{button{display:none!important}}</style></head><body>${html}<div style="margin-top:24px;text-align:right"><button onclick="window.print()" style="padding:10px 22px;background:#2563EB;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:800">Print</button><button onclick="window.close()" style="padding:10px 22px;background:#f3f4f6;color:#374151;border:none;border-radius:8px;cursor:pointer;font-size:14px;margin-left:8px">Close</button></div></body></html>`);
   win.document.close();
 }
 
@@ -387,7 +387,7 @@ export default function App(){
   if(!session)return<LoginScreen onLogin={handleLogin}/>;
 
   const theme=data?.theme||{};
-  const PRIMARY=theme.primary||"#4f46e5";
+  const PRIMARY=theme.primary||"#2563EB";
   const SIDEBAR=theme.sidebar||"#1a1a2e";
   const BG=theme.bgColor||"#f0f0f8";
   const isOwner=!session?.isDevView; // Dev view is read-only; real owner login gets edit rights
@@ -425,9 +425,9 @@ export default function App(){
 
         {/* Logo */}
         <div style={{display:"flex",alignItems:"center",gap:8,marginRight:4,flexShrink:0}}>
-          <div style={{width:28,height:28,borderRadius:7,overflow:"hidden",background:"rgba(255,255,255,0.1)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{theme.logoUrl?<img src={theme.logoUrl} alt="logo" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:7}} onError={e=>{e.target.style.display="none";e.target.nextSibling.style.display="flex";}}/>:<img src="/icons/icon-192.png" alt="POS Pro" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:7}}/>}</div>
+          <div style={{width:28,height:28,borderRadius:7,overflow:"hidden",background:"rgba(255,255,255,0.1)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{theme.logoUrl?<img src={theme.logoUrl} alt="logo" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:7}} onError={e=>{e.target.style.display="none";e.target.nextSibling.style.display="flex";}}/>:<img src="/icons/icon-192.png" alt="NJ POS" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:7}}/>}</div>
           <div>
-            <div style={{fontWeight:800,fontSize:11,lineHeight:1}}>{store?.store_name||"POS Pro"}</div>
+            <div style={{fontWeight:800,fontSize:11,lineHeight:1}}>{store?.store_name||"NJ POS"}</div>
             <div style={{fontSize:9,color:"rgba(255,255,255,0.4)",marginTop:1}}>Owner Portal</div>
           </div>
         </div>
@@ -456,9 +456,9 @@ export default function App(){
             {/* Drawer header */}
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,padding:"0 4px"}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
-                <div style={{width:34,height:34,borderRadius:9,overflow:"hidden"}}><img src="/icons/icon-192.png" alt="POS Pro" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:9}}/></div>
+                <div style={{width:34,height:34,borderRadius:9,overflow:"hidden"}}><img src="/icons/icon-192.png" alt="NJ POS" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:9}}/></div>
                 <div>
-                  <div style={{fontWeight:800,fontSize:14,color:"#fff"}}>{store?.store_name||"POS Pro"}</div>
+                  <div style={{fontWeight:800,fontSize:14,color:"#fff"}}>{store?.store_name||"NJ POS"}</div>
                   <div style={{fontSize:10,color:"rgba(255,255,255,0.4)"}}>Owner Portal</div>
                 </div>
               </div>
@@ -546,8 +546,8 @@ function LoginScreen({onLogin}){
     <div style={{minHeight:"100vh",background:BG,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"sans-serif",padding:20}}>
       <div style={{width:"100%",maxWidth:400}}>
         <div style={{textAlign:"center",marginBottom:24}}>
-          <div style={{width:66,height:66,borderRadius:18,overflow:"hidden",margin:"0 auto 12px",boxShadow:"0 8px 32px rgba(79,70,229,0.5)"}}><img src="/icons/icon-192.png" alt="POS Pro" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:18}}/></div>
-          <div style={{fontSize:24,fontWeight:800,color:"#fff"}}>POS Pro</div>
+          <div style={{width:66,height:66,borderRadius:18,overflow:"hidden",margin:"0 auto 12px",boxShadow:"0 8px 32px rgba(37,99,235,0.5)"}}><img src="/icons/icon-192.png" alt="NJ POS" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:18}}/></div>
+          <div style={{fontSize:24,fontWeight:800,color:"#fff"}}>NJ POS</div>
           <div style={{fontSize:12,color:"rgba(255,255,255,0.45)",marginTop:3}}>Owner Portal</div>
         </div>
         <div style={{background:"#fff",borderRadius:20,padding:"28px 28px 24px",boxShadow:"0 24px 60px rgba(0,0,0,0.4)"}}>
@@ -557,7 +557,7 @@ function LoginScreen({onLogin}){
             <FRow label="Owner Email"><input type="email" value={email} onChange={e=>{setEmail(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&sendOTP()} placeholder="owner@email.com" style={INP} autoFocus/></FRow>
             <Err msg={error}/>
             {info&&<div style={{marginTop:8,padding:"8px 12px",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:8,fontSize:12,color:"#166534"}}>{info}</div>}
-            <button onClick={sendOTP} disabled={loading} style={{width:"100%",marginTop:16,padding:"12px 0",background:loading?"#a5b4fc":"#4f46e5",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            <button onClick={sendOTP} disabled={loading} style={{width:"100%",marginTop:16,padding:"12px 0",background:loading?"#93C5FD":"#2563EB",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
               {loading?<><i className="ti ti-loader-2" style={{fontSize:17}}/>Sending…</>:<><i className="ti ti-mail" style={{fontSize:17}}/>Send Sign-In Code</>}
             </button>
           </>)}
@@ -567,21 +567,21 @@ function LoginScreen({onLogin}){
             </button>
             <div style={{fontWeight:800,fontSize:17,marginBottom:4}}>Enter Your Code</div>
             <div style={{fontSize:13,color:"#9ca3af",marginBottom:6}}>Code sent to:</div>
-            <div style={{fontSize:14,fontWeight:700,color:"#4f46e5",marginBottom:14}}>{email}</div>
+            <div style={{fontSize:14,fontWeight:700,color:"#2563EB",marginBottom:14}}>{email}</div>
             {info&&<div style={{marginBottom:12,padding:"8px 12px",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:8,fontSize:12,color:"#166534"}}>{info}</div>}
             <FRow label="6-Digit Code">
               <input type="text" inputMode="numeric" value={otp} onChange={e=>{setOtp(e.target.value.replace(/\D/g,"").slice(0,6));setError("");}} onKeyDown={e=>e.key==="Enter"&&verifyOTP()} placeholder="000000" style={{...INP,fontSize:26,fontWeight:800,letterSpacing:8,textAlign:"center"}} autoFocus/>
             </FRow>
             <Err msg={error}/>
-            <button onClick={verifyOTP} disabled={loading||otp.length<6} style={{width:"100%",marginTop:14,padding:"12px 0",background:loading||otp.length<6?"#a5b4fc":"#4f46e5",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            <button onClick={verifyOTP} disabled={loading||otp.length<6} style={{width:"100%",marginTop:14,padding:"12px 0",background:loading||otp.length<6?"#93C5FD":"#2563EB",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
               {loading?<><i className="ti ti-loader-2" style={{fontSize:17}}/>Verifying…</>:<><i className="ti ti-check" style={{fontSize:17}}/>Sign In</>}
             </button>
             <div style={{marginTop:12,textAlign:"center",fontSize:12,color:"#9ca3af"}}>
-              {countdown>0?`Resend code in ${countdown}s`:<button onClick={()=>{setOtp("");sendOTP();}} style={{background:"none",border:"none",cursor:"pointer",color:"#4f46e5",fontSize:12,fontWeight:700}}>Resend Code</button>}
+              {countdown>0?`Resend code in ${countdown}s`:<button onClick={()=>{setOtp("");sendOTP();}} style={{background:"none",border:"none",cursor:"pointer",color:"#2563EB",fontSize:12,fontWeight:700}}>Resend Code</button>}
             </div>
           </>)}
         </div>
-        <div style={{marginTop:14,textAlign:"center",fontSize:11,color:"rgba(255,255,255,0.25)"}}>POS Pro Owner Portal · client.pospro-portal.com</div>
+        <div style={{marginTop:14,textAlign:"center",fontSize:11,color:"rgba(255,255,255,0.25)"}}>NJ POS Owner Portal · owner.nj-systems.com</div>
       </div>
     </div>
   );
@@ -624,7 +624,7 @@ function Dashboard({store,data,primary,licenseRow}){
             <i className="ti ti-clock-off" style={{fontSize:22,color:"#dc2626",flexShrink:0}}/>
             <div>
               <div style={{fontWeight:800,color:"#dc2626",fontSize:14}}>Trial Expired</div>
-              <div style={{fontSize:12,color:"#9ca3af",marginTop:2}}>Contact your POS Pro provider to purchase a permanent activation code and continue.</div>
+              <div style={{fontSize:12,color:"#9ca3af",marginTop:2}}>Contact your NJ POS provider to purchase a permanent activation code and continue.</div>
             </div>
           </div>
         );
@@ -658,7 +658,7 @@ function Dashboard({store,data,primary,licenseRow}){
                   <span style={{fontSize:12,color:"#6b7280",marginLeft:"auto"}}>{activeShift.startTime}</span>
                 </div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,marginBottom:Object.keys(liveBreakdown).length>0?10:0}}>
-                  {[{label:"Cashier",value:activeShift.cashier,color:"#166534"},{label:"Opening Cash",value:fmt(activeShift.openCash),color:"#374151"},{label:"Shift Sales",value:fmt(shiftSales),color:primary||"#4f46e5"},{label:"Orders",value:`${shiftOrders.length} orders`,color:"#374151"}].map(r=>(
+                  {[{label:"Cashier",value:activeShift.cashier,color:"#166534"},{label:"Opening Cash",value:fmt(activeShift.openCash),color:"#374151"},{label:"Shift Sales",value:fmt(shiftSales),color:primary||"#2563EB"},{label:"Orders",value:`${shiftOrders.length} orders`,color:"#374151"}].map(r=>(
                     <div key={r.label} style={{background:"#fff",borderRadius:8,padding:"8px 12px"}}>
                       <div style={{fontSize:10,color:"#9ca3af",fontWeight:600,textTransform:"uppercase",letterSpacing:0.4,marginBottom:3}}>{r.label}</div>
                       <div style={{fontSize:14,fontWeight:800,color:r.color}}>{r.value}</div>
@@ -764,7 +764,7 @@ function PortalShiftsTab({shifts,filteredShifts,logs=[],fmt,primary,shiftPeriod,
     setTimeout(()=>setSaveToast(false),2500);
   };
   const filteredSales=filteredShifts.reduce((s,x)=>s+(x.totalSales||0),0);
-  const P=primary||"#4f46e5";
+  const P=primary||"#2563EB";
   return(
     <div style={{display:"flex",flexDirection:"column",gap:10}}>
       <div style={{display:"flex",flexWrap:"wrap",gap:6,alignItems:"center",marginBottom:4}}>
@@ -898,7 +898,7 @@ function PortalShiftsTab({shifts,filteredShifts,logs=[],fmt,primary,shiftPeriod,
                   <button onClick={()=>setEditExpenses(editExpenses.filter((_,j)=>j!==i))} style={{padding:"4px 8px",border:"1px solid #fecaca",borderRadius:7,cursor:"pointer",background:"#fef2f2",color:"#dc2626",fontSize:12}}>✕</button>
                 </div>
               ))}
-              <button onClick={()=>setEditExpenses([...editExpenses,{name:"",amount:""}])} style={{fontSize:12,color:"#4f46e5",background:"none",border:"none",cursor:"pointer",fontWeight:700}}>+ Add expense</button>
+              <button onClick={()=>setEditExpenses([...editExpenses,{name:"",amount:""}])} style={{fontSize:12,color:"#2563EB",background:"none",border:"none",cursor:"pointer",fontWeight:700}}>+ Add expense</button>
             </div>
             <div style={{marginBottom:16}}>
               <label style={{fontSize:11,fontWeight:800,color:"#6b7280",textTransform:"uppercase",letterSpacing:0.5,display:"block",marginBottom:5}}>Notes (optional)</label>
@@ -994,7 +994,7 @@ function Reports({store,data,primary,isOwner,saveField}){
     printReport(`<h1>Shift Report — ${shiftPeriodLabel}</h1><p class="meta">Store: ${store?.store_name} | ${filteredShifts.length} shifts</p><table><thead><tr><th>Cashier</th><th>Period</th><th class="right">Orders</th><th class="right">Opening</th><th class="right">Sales</th><th class="right">Expenses</th><th class="right">Closing</th><th class="right">Over/Short</th></tr></thead><tbody>${rows}</tbody></table>`,`Shift Report — ${store?.store_name}`);
   };
   const doPrintBIR=()=>{
-    printReport(`<h1>BIR Tax Reference — ${birMonth}</h1><p class="meta">Store: ${store?.store_name} | For reference only</p><table><thead><tr><th>Category</th><th class="right">Amount</th></tr></thead><tbody><tr><td>Gross Sales</td><td class="right bold">${fmt(birGross)}</td></tr><tr><td>VATable Sales</td><td class="right">${fmt(birVatable)}</td></tr><tr><td><b>Output VAT (12%)</b></td><td class="right bold" style="color:#4f46e5">${fmt(birVat)}</td></tr><tr><td>VAT-Exempt Sales</td><td class="right">${fmt(birExempt)}</td></tr><tr><td>Zero-Rated</td><td class="right">₱0.00</td></tr><tr><td>Total Orders</td><td class="right">${birOrders.length}</td></tr></tbody></table><div style="margin-top:14px;padding:10px 14px;background:#fef3c7;border-radius:8px;font-size:11px;color:#92400e">⚠️ For reference only. Consult your licensed accountant for official BIR filings.</div>`,`BIR Tax — ${store?.store_name}`);
+    printReport(`<h1>BIR Tax Reference — ${birMonth}</h1><p class="meta">Store: ${store?.store_name} | For reference only</p><table><thead><tr><th>Category</th><th class="right">Amount</th></tr></thead><tbody><tr><td>Gross Sales</td><td class="right bold">${fmt(birGross)}</td></tr><tr><td>VATable Sales</td><td class="right">${fmt(birVatable)}</td></tr><tr><td><b>Output VAT (12%)</b></td><td class="right bold" style="color:#2563EB">${fmt(birVat)}</td></tr><tr><td>VAT-Exempt Sales</td><td class="right">${fmt(birExempt)}</td></tr><tr><td>Zero-Rated</td><td class="right">₱0.00</td></tr><tr><td>Total Orders</td><td class="right">${birOrders.length}</td></tr></tbody></table><div style="margin-top:14px;padding:10px 14px;background:#fef3c7;border-radius:8px;font-size:11px;color:#92400e">⚠️ For reference only. Consult your licensed accountant for official BIR filings.</div>`,`BIR Tax — ${store?.store_name}`);
   };
   return(
     <div>
@@ -1210,7 +1210,7 @@ function Inventory({store,data,session,primary}){
     (p.name.toLowerCase().includes(search.toLowerCase())||p.sku?.includes(search))
   );
   const fmt=(n)=>`₱${Number(n||0).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-  const P=primary||"#4f46e5";
+  const P=primary||"#2563EB";
 
   return(
     <div>
@@ -1319,7 +1319,7 @@ function Inventory({store,data,session,primary}){
                               {p.hasVariants&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#f5f3ff",color:"#7c3aed"}}>{(p.variants||[]).length} variants</span>}
                               {p.recipe?.length>0&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#e0f2fe",color:"#0891b2"}}>{p.recipe.length} inclusions</span>}
                               {p.recipe?.length>0&&p.stockMode==="auto"&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#f0fdf4",color:"#16a34a"}}>⚙ auto stock</span>}
-                              {p.soldByWeight&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#f0fdfa",color:"#0f766e"}}>⚖ sold by weight</span>}
+                              {p.soldByWeight&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#EFF6FF",color:"#0f766e"}}>⚖ sold by weight</span>}
                               {p.showInPOS===false&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:8,background:"#fef3c7",color:"#92400e"}}>Hidden from POS</span>}
                             </div>
                           </div>
@@ -1664,13 +1664,13 @@ function Orders({store,data,session,saveField}){
         <span style={{fontWeight:800,fontSize:18,marginRight:4}}>Orders</span>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search order ID or cashier…" style={{...INP,flex:1,minWidth:180,padding:"7px 12px"}}/>
         <div style={{display:"flex",gap:5}}>
-          {["all","paid","void"].map(f=><button key={f} onClick={()=>setFilter(f)} style={{padding:"5px 12px",borderRadius:6,border:"1px solid",cursor:"pointer",fontSize:12,fontWeight:700,textTransform:"capitalize",borderColor:filter===f?"#4f46e5":"#e5e7eb",background:filter===f?"#4f46e5":"#fff",color:filter===f?"#fff":"#6b7280"}}>{f}</button>)}
+          {["all","paid","void"].map(f=><button key={f} onClick={()=>setFilter(f)} style={{padding:"5px 12px",borderRadius:6,border:"1px solid",cursor:"pointer",fontSize:12,fontWeight:700,textTransform:"capitalize",borderColor:filter===f?"#2563EB":"#e5e7eb",background:filter===f?"#2563EB":"#fff",color:filter===f?"#fff":"#6b7280"}}>{f}</button>)}
         </div>
       </div>
       <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:14,flexWrap:"wrap"}}>
         <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
           {[{k:"today",l:"Today"},{k:"week",l:"Week"},{k:"month",l:"Month"},{k:"all",l:"All"},{k:"custom",l:"Custom"}].map(p=>(
-            <button key={p.k} onClick={()=>setPeriod(p.k)} style={{padding:"4px 9px",borderRadius:6,border:"1px solid",cursor:"pointer",fontSize:11,fontWeight:700,borderColor:period===p.k?"#4f46e5":"#e5e7eb",background:period===p.k?"#4f46e5":"#fff",color:period===p.k?"#fff":"#6b7280"}}>{p.l}</button>
+            <button key={p.k} onClick={()=>setPeriod(p.k)} style={{padding:"4px 9px",borderRadius:6,border:"1px solid",cursor:"pointer",fontSize:11,fontWeight:700,borderColor:period===p.k?"#2563EB":"#e5e7eb",background:period===p.k?"#2563EB":"#fff",color:period===p.k?"#fff":"#6b7280"}}>{p.l}</button>
           ))}
         </div>
         {period==="custom"&&(<>
@@ -1692,7 +1692,7 @@ function Orders({store,data,session,saveField}){
               <div style={{fontSize:11,color:"#9ca3af",marginTop:2}}>{o.date} · {o.cashier}</div>
               <div style={{fontSize:12,color:"#6b7280",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{o.items?.map(i=>`${i.name} ×${i.qty}`).join(", ")}</div>
             </div>
-            <span style={{fontWeight:800,fontSize:14,color:"#4f46e5",flexShrink:0}}>{fmt(o.total)}</span>
+            <span style={{fontWeight:800,fontSize:14,color:"#2563EB",flexShrink:0}}>{fmt(o.total)}</span>
           </div>
         ))}
       </div>
@@ -1704,7 +1704,7 @@ function Orders({store,data,session,saveField}){
             {detail.items?.map((it,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"4px 0",borderBottom:"1px solid #f3f4f6"}}><span>{it.name} ×{it.qty}</span><span style={{fontWeight:700}}>{fmt(it.price*it.qty)}</span></div>)}
             {detail.discountAmt>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"#16a34a",marginTop:6}}><span>Discount</span><span>−{fmt(detail.discountAmt)}</span></div>}
             {detail.vatAmt>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"#0891b2",marginTop:4}}><span>VAT ({detail.vatPercent}%)</span><span>+{fmt(detail.vatAmt)}</span></div>}
-            <div style={{display:"flex",justifyContent:"space-between",fontWeight:800,fontSize:16,margin:"10px 0 12px",paddingTop:8,borderTop:"1px dashed #e5e7eb"}}><span>Total</span><span style={{color:"#4f46e5"}}>{fmt(detail.total)}</span></div>
+            <div style={{display:"flex",justifyContent:"space-between",fontWeight:800,fontSize:16,margin:"10px 0 12px",paddingTop:8,borderTop:"1px dashed #e5e7eb"}}><span>Total</span><span style={{color:"#2563EB"}}>{fmt(detail.total)}</span></div>
             <div style={{display:"flex",gap:8}}>
               <button onClick={()=>setDetail(null)} style={{flex:1,padding:"9px 0",border:"1px solid #e5e7eb",background:"#fff",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700}}>Close</button>
               
@@ -1769,7 +1769,7 @@ function Accounts({store,data,session,saveField}){
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
         <div style={{fontWeight:800,fontSize:18}}>Staff Accounts</div>
-        <button onClick={openAdd} style={{padding:"7px 16px",background:"#4f46e5",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:5}}><i className="ti ti-plus"/>Add Account</button>
+        <button onClick={openAdd} style={{padding:"7px 16px",background:"#2563EB",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",gap:5}}><i className="ti ti-plus"/>Add Account</button>
       </div>
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {accounts.map(a=>{
@@ -1829,7 +1829,7 @@ function Accounts({store,data,session,saveField}){
             {msg&&<div style={{marginTop:10,fontSize:13,fontWeight:700,color:msg==="Saved!"?"#166534":"#991b1b"}}>{msg}</div>}
             <div style={{display:"flex",gap:8,marginTop:16}}>
               <button onClick={()=>setModal(null)} style={{flex:1,padding:"10px 0",border:"1px solid #e5e7eb",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700}}>Cancel</button>
-              <button onClick={save} disabled={saving} style={{flex:2,padding:"10px 0",background:saving?"#a5b4fc":"#4f46e5",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:800}}>{saving?"Saving…":modal==="add"?"Create Account":"Save Changes"}</button>
+              <button onClick={save} disabled={saving} style={{flex:2,padding:"10px 0",background:saving?"#93C5FD":"#2563EB",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:800}}>{saving?"Saving…":modal==="add"?"Create Account":"Save Changes"}</button>
             </div>
           </div>
         </div>
@@ -1849,7 +1849,7 @@ function Settings({store,data,session,onRefresh}){
   return(
     <div>
       <div style={{display:"flex",gap:6,marginBottom:20,flexWrap:"wrap"}}>
-        {TABS.map(t=><button key={t.k} onClick={()=>setSTab(t.k)} style={{padding:"6px 16px",borderRadius:8,border:"1px solid",cursor:"pointer",fontSize:13,fontWeight:700,borderColor:sTab===t.k?"#4f46e5":"#e5e7eb",background:sTab===t.k?"#4f46e5":"#fff",color:sTab===t.k?"#fff":"#6b7280"}}>{t.l}</button>)}
+        {TABS.map(t=><button key={t.k} onClick={()=>setSTab(t.k)} style={{padding:"6px 16px",borderRadius:8,border:"1px solid",cursor:"pointer",fontSize:13,fontWeight:700,borderColor:sTab===t.k?"#2563EB":"#e5e7eb",background:sTab===t.k?"#2563EB":"#fff",color:sTab===t.k?"#fff":"#6b7280"}}>{t.l}</button>)}
       </div>
       {sTab!=="devices"&&<div style={{fontSize:11,color:"#9ca3af",marginBottom:16,padding:"8px 12px",background:"#f9fafb",borderRadius:8,border:"1px solid #e5e7eb"}}>
         <i className="ti ti-lock" style={{marginRight:6}}/>Settings are read-only in the portal. To change settings, open the POS app on your device.
@@ -1862,7 +1862,7 @@ function Settings({store,data,session,onRefresh}){
             <div><label style={LBL2}>Logo Text</label><div style={RO}>{theme.logoText||"—"}</div></div>
             <div><label style={LBL2}>Font</label><div style={RO}>{theme.fontFamily||"sans-serif"}</div></div>
             <div><label style={LBL2}>Border Radius</label><div style={RO}>{theme.borderRadius||"10"}px</div></div>
-            <div><label style={LBL2}>Primary Color</label><div style={{...RO,display:"flex",alignItems:"center",gap:8}}><span style={{width:16,height:16,borderRadius:4,background:theme.primary||"#4f46e5",display:"inline-block",border:"1px solid #e5e7eb"}}/>{theme.primary||"#4f46e5"}</div></div>
+            <div><label style={LBL2}>Primary Color</label><div style={{...RO,display:"flex",alignItems:"center",gap:8}}><span style={{width:16,height:16,borderRadius:4,background:theme.primary||"#2563EB",display:"inline-block",border:"1px solid #e5e7eb"}}/>{theme.primary||"#2563EB"}</div></div>
             <div><label style={LBL2}>Sidebar Color</label><div style={{...RO,display:"flex",alignItems:"center",gap:8}}><span style={{width:16,height:16,borderRadius:4,background:theme.sidebar||"#1a1a2e",display:"inline-block",border:"1px solid #e5e7eb"}}/>{theme.sidebar||"#1a1a2e"}</div></div>
           </div>
         </Card>
@@ -1926,7 +1926,7 @@ function DevicesTab({store,session,onRefresh}){
     if(session?.isDevView){setError("Device removal is disabled in Developer View — sign in as the owner to manage devices.");return;}
     setLoading(true);setError("");setSuccess("");
     // Reuse portal OTP system — sends to owner email
-    const result=await sendPortalOTP(session.email, store?.store_name||"POS Pro","device");
+    const result=await sendPortalOTP(session.email, store?.store_name||"NJ POS","device");
     setLoading(false);
     if(!result.ok){setError("Failed to send code. Check your connection.");return;}
     setOtpSent(true);
@@ -1982,7 +1982,7 @@ function DevicesTab({store,session,onRefresh}){
           <div key={d.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 16px",background:"#f9fafb",borderRadius:10,border:"1px solid #e5e7eb",marginBottom:10}}>
             <div style={{display:"flex",alignItems:"center",gap:12}}>
               <div style={{width:40,height:40,borderRadius:10,background:"#ede9fe",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                <i className="ti ti-device-desktop" style={{fontSize:20,color:"#4f46e5"}}/>
+                <i className="ti ti-device-desktop" style={{fontSize:20,color:"#2563EB"}}/>
               </div>
               <div>
                 <div style={{fontWeight:700,fontSize:14}}>{d.name||"Unnamed Device"}</div>
@@ -2037,7 +2037,7 @@ function DevicesTab({store,session,onRefresh}){
               </button>
             </div>
             <div style={{marginTop:12,textAlign:"center"}}>
-              <button onClick={()=>sendRemoveOTP(otpModal)} disabled={loading} style={{background:"none",border:"none",cursor:"pointer",color:"#4f46e5",fontSize:12,fontWeight:600}}>
+              <button onClick={()=>sendRemoveOTP(otpModal)} disabled={loading} style={{background:"none",border:"none",cursor:"pointer",color:"#2563EB",fontSize:12,fontWeight:600}}>
                 Resend Code
               </button>
             </div>

@@ -61,10 +61,10 @@ function StepDots({ step }) {
             <div style={{
               width: 26, height: 26, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 12, fontWeight: 800, color: i <= idx ? "#fff" : "#9ca3af", flexShrink: 0,
-              background: i <= idx ? "#4f46e5" : "#e5e7eb",
+              background: i <= idx ? "#2563EB" : "#e5e7eb",
             }}>{i < idx ? "✓" : i + 1}</div>
             <span className="step-label" style={{ fontSize: 12, fontWeight: 700, color: i <= idx ? "#111" : "#9ca3af", whiteSpace: "nowrap" }}>{label}</span>
-            {i < steps.length - 1 && <div className="step-connector" style={{ width: 24, height: 2, background: i < idx ? "#4f46e5" : "#e5e7eb", marginLeft: 4, flexShrink: 0 }} />}
+            {i < steps.length - 1 && <div className="step-connector" style={{ width: 24, height: 2, background: i < idx ? "#2563EB" : "#e5e7eb", marginLeft: 4, flexShrink: 0 }} />}
           </div>
         ))}
       </div>
@@ -77,7 +77,7 @@ export default function PaymentApp() {
   const initialPlan = params.get("plan") === "lifetime" ? "lifetime" : "monthly";
 
   const [step, setStep] = useState("plan");
-  const LANDING_PAGE_URL = "https://www.pospro-portal.com";
+  const LANDING_PAGE_URL = "https://www.nj-systems.com";
   const [redirectIn, setRedirectIn] = useState(10);
   useEffect(() => {
     if (step !== "done") return;
@@ -112,7 +112,7 @@ export default function PaymentApp() {
   const downloadQr = () => {
     const a = document.createElement("a");
     a.href = QR_IMAGE_URL;
-    a.download = "pospro-gcash-qr.jpg";
+    a.download = "njpos-gcash-qr.jpg";
     a.click();
   };
 
@@ -148,7 +148,7 @@ export default function PaymentApp() {
   };
 
   const cardStyle = (selected) => ({
-    flex: 1, minWidth: 220, border: `2px solid ${selected ? "#4f46e5" : "#e5e7eb"}`, borderRadius: 14,
+    flex: 1, minWidth: 220, border: `2px solid ${selected ? "#2563EB" : "#e5e7eb"}`, borderRadius: 14,
     padding: 22, cursor: "pointer", background: selected ? "#f5f3ff" : "#fff", textAlign: "left",
   });
 
@@ -157,9 +157,9 @@ export default function PaymentApp() {
       <div style={{ maxWidth: 640, margin: "0 auto" }}>
         <div style={{ textAlign: "center", marginBottom: 30 }}>
           <div style={{ width: 56, height: 56, borderRadius: 14, overflow: "hidden", margin: "0 auto 12px" }}>
-            <img src="/icons/icon-192.png" alt="POS Pro" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <img src="/icons/icon-192.png" alt="NJ POS" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           </div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#111" }}>POS Pro</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#111" }}>NJ POS</div>
         </div>
 
         {step !== "done" && <StepDots step={step} />}
@@ -174,16 +174,16 @@ export default function PaymentApp() {
               <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
                 <button style={cardStyle(plan === "monthly")} onClick={() => setPlan("monthly")}>
                   <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Standard</div>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: "#4f46e5" }}>₱399<span style={{ fontSize: 13, color: "#9ca3af", fontWeight: 600 }}>/mo</span></div>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: "#2563EB" }}>₱399<span style={{ fontSize: 13, color: "#9ca3af", fontWeight: 600 }}>/mo</span></div>
                   <div style={{ fontSize: 12, color: "#6b7280", marginTop: 6 }}>Billed monthly, cancel anytime</div>
                 </button>
                 <button style={cardStyle(plan === "lifetime")} onClick={() => setPlan("lifetime")}>
                   <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Lifetime</div>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: "#4f46e5" }}>₱8,999</div>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: "#2563EB" }}>₱8,999</div>
                   <div style={{ fontSize: 12, color: "#6b7280", marginTop: 6 }}>One-time payment, yours forever</div>
                 </button>
               </div>
-              <button onClick={() => setStep("addons")} style={{ width: "100%", padding: "13px 0", background: "#4f46e5", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
+              <button onClick={() => setStep("addons")} style={{ width: "100%", padding: "13px 0", background: "#2563EB", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
                 Continue
               </button>
             </>
@@ -216,13 +216,13 @@ export default function PaymentApp() {
                       <div style={{ fontSize: 12, color: "#6b7280" }}>{f.desc}</div>
                     </div>
                   </div>
-                  <div style={{ fontWeight: 800, fontSize: 14, color: "#4f46e5", whiteSpace: "nowrap" }}>{fmt(FEATURE_PRICE)}</div>
+                  <div style={{ fontWeight: 800, fontSize: 14, color: "#2563EB", whiteSpace: "nowrap" }}>{fmt(FEATURE_PRICE)}</div>
                 </label>
               ))}
 
               <div style={{ display: "flex", gap: 10, marginTop: 22 }}>
                 <button onClick={() => setStep("plan")} style={{ flex: 1, padding: "13px 0", background: "#fff", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Back</button>
-                <button onClick={() => setStep("review")} style={{ flex: 2, padding: "13px 0", background: "#4f46e5", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: "pointer" }}>Continue</button>
+                <button onClick={() => setStep("review")} style={{ flex: 2, padding: "13px 0", background: "#2563EB", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: "pointer" }}>Continue</button>
               </div>
             </>
           )}
@@ -240,11 +240,11 @@ export default function PaymentApp() {
               ))}
               <div style={{ display: "flex", justifyContent: "space-between", padding: "16px 0 0", fontSize: 17 }}>
                 <span style={{ fontWeight: 800 }}>Total</span>
-                <span style={{ fontWeight: 800, color: "#4f46e5" }}>{fmt(total)}</span>
+                <span style={{ fontWeight: 800, color: "#2563EB" }}>{fmt(total)}</span>
               </div>
               <div style={{ display: "flex", gap: 10, marginTop: 22 }}>
                 <button onClick={() => setStep("addons")} style={{ flex: 1, padding: "13px 0", background: "#fff", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Back</button>
-                <button onClick={() => setStep("details")} style={{ flex: 2, padding: "13px 0", background: "#4f46e5", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: "pointer" }}>Proceed to Payment</button>
+                <button onClick={() => setStep("details")} style={{ flex: 2, padding: "13px 0", background: "#2563EB", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: "pointer" }}>Proceed to Payment</button>
               </div>
             </>
           )}
@@ -254,15 +254,15 @@ export default function PaymentApp() {
             <>
               <h2 style={{ margin: "0 0 6px", fontSize: 19 }}>Complete your payment</h2>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f5f3ff", borderRadius: 10, padding: "12px 16px", marginBottom: 20 }}>
-                <span style={{ fontSize: 13, color: "#4f46e5", fontWeight: 700 }}>Total to pay</span>
-                <span style={{ fontSize: 20, fontWeight: 800, color: "#4f46e5" }}>{fmt(total)}</span>
+                <span style={{ fontSize: 13, color: "#2563EB", fontWeight: 700 }}>Total to pay</span>
+                <span style={{ fontSize: 20, fontWeight: 800, color: "#2563EB" }}>{fmt(total)}</span>
               </div>
 
               <div style={{ textAlign: "center", marginBottom: 18 }}>
                 <img src={QR_IMAGE_URL} alt="GCash QR" style={{ width: 220, height: 220, borderRadius: 12, border: "1px solid #e5e7eb" }} />
                 <div style={{ marginTop: 10, fontSize: 15, fontWeight: 700, color: "#111" }}>
                   GCash: {GCASH_NUMBER}
-                  <button onClick={copyGcash} title="Copy number" style={{ marginLeft: 8, background: "none", border: "none", cursor: "pointer", color: "#4f46e5", verticalAlign: "middle" }}>
+                  <button onClick={copyGcash} title="Copy number" style={{ marginLeft: 8, background: "none", border: "none", cursor: "pointer", color: "#2563EB", verticalAlign: "middle" }}>
                     <i className="ti ti-copy" />
                   </button>
                 </div>
@@ -283,7 +283,7 @@ export default function PaymentApp() {
                 <input value={storeName} onChange={e => setStoreName(e.target.value)} placeholder="Store name" style={inputStyle} />
                 <div>
                   <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px dashed #d1d5db", borderRadius: 10, cursor: "pointer" }}>
-                    <i className="ti ti-upload" style={{ color: "#4f46e5" }} />
+                    <i className="ti ti-upload" style={{ color: "#2563EB" }} />
                     <span style={{ fontSize: 13, color: screenshotPreview ? "#111" : "#9ca3af" }}>{screenshotPreview ? "Screenshot attached ✓" : "Upload payment screenshot (required)"}</span>
                     <input type="file" accept="image/*" onChange={handleFile} style={{ display: "none" }} />
                   </label>
@@ -295,7 +295,7 @@ export default function PaymentApp() {
 
               <div style={{ display: "flex", gap: 10 }}>
                 <button onClick={() => setStep("review")} style={{ flex: 1, padding: "13px 0", background: "#fff", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Back</button>
-                <button onClick={submit} disabled={submitting} style={{ flex: 2, padding: "13px 0", background: "#4f46e5", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: "pointer", opacity: submitting ? 0.7 : 1 }}>
+                <button onClick={submit} disabled={submitting} style={{ flex: 2, padding: "13px 0", background: "#2563EB", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: "pointer", opacity: submitting ? 0.7 : 1 }}>
                   {submitting ? "Submitting…" : "Complete Payment"}
                 </button>
               </div>
@@ -312,7 +312,7 @@ export default function PaymentApp() {
               <p style={{ color: "#6b7280", fontSize: 14, lineHeight: 1.6 }}>
                 We've received your submission. Once we confirm your payment, you'll get an email with your activation code — usually within a few hours.
               </p>
-              <button onClick={() => window.location.href = LANDING_PAGE_URL} style={{ marginTop: 20, padding: "12px 28px", background: "#4f46e5", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
+              <button onClick={() => window.location.href = LANDING_PAGE_URL} style={{ marginTop: 20, padding: "12px 28px", background: "#2563EB", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
                 Return to Homepage
               </button>
               <p style={{ color: "#9ca3af", fontSize: 12, marginTop: 14 }}>Redirecting automatically in {redirectIn}s…</p>

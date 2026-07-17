@@ -64,7 +64,7 @@ const fmtTimeLabel = (t) => {
   return `${h12}:${String(m).padStart(2,"0")} ${period}`;
 };
 
-const API_BASE = ""; // same-origin (client.pospro-portal.com/api/*)
+const API_BASE = ""; // same-origin (owner.nj-systems.com/api/*)
 
 export default function BookingApp() {
   // Path is /bookings/{slug} — the vercel.json rewrite serves this bundle
@@ -235,20 +235,20 @@ export default function BookingApp() {
   }
 
   return (
-    <div style={{minHeight:"100vh",boxSizing:"border-box",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",padding:"40px 16px",background:"#f1f8f6"}}>
+    <div style={{minHeight:"100vh",boxSizing:"border-box",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",padding:"40px 16px",background:"#EFF6FF"}}>
       <div style={{maxWidth:520,margin:"0 auto"}}>
         <div style={{textAlign:"center",marginBottom:24}}>
           <div style={{width:52,height:52,borderRadius:14,overflow:"hidden",margin:"0 auto 10px"}}>
             <img src={store.logoUrl || "/icons/icon-192.png"} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
           </div>
           <div style={{fontSize:20,fontWeight:800,color:"#111"}}>{store.storeName}</div>
-          <div style={{fontSize:13,color:"#0d9488",fontWeight:700,marginTop:2}}>{store.tagline}</div>
+          <div style={{fontSize:13,color:"#2563EB",fontWeight:700,marginTop:2}}>{store.tagline}</div>
         </div>
 
         <div style={{background:"#fff",borderRadius:18,padding:"26px 24px",boxShadow:"0 4px 24px rgba(0,0,0,0.06)"}}>
           {step !== "done" && step !== "service" && step !== "payment" && (
             <button onClick={() => setStep(step==="details"?"schedule":step==="schedule"&&service?.resourceRequired?"resource":"service")}
-              style={{background:"none",border:"none",color:"#0d9488",fontSize:13,fontWeight:700,cursor:"pointer",padding:0,marginBottom:16,display:"flex",alignItems:"center",gap:4}}>
+              style={{background:"none",border:"none",color:"#2563EB",fontSize:13,fontWeight:700,cursor:"pointer",padding:0,marginBottom:16,display:"flex",alignItems:"center",gap:4}}>
               <i className="ti ti-chevron-left"/> Back
             </button>
           )}
@@ -263,7 +263,7 @@ export default function BookingApp() {
                     style={{textAlign:"left",padding:"14px 16px",border:"1px solid #e5e7eb",borderRadius:12,background:"#fff",cursor:"pointer"}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
                       <div style={{fontWeight:700,fontSize:14,color:"#111"}}>{s.name}</div>
-                      <div style={{fontWeight:800,fontSize:14,color:"#0d9488"}}>{fmtPeso(s.price)}{s.durationMode==="flexible"&&s.pricingMode==="hourly"?"/hr":""}</div>
+                      <div style={{fontWeight:800,fontSize:14,color:"#2563EB"}}>{fmtPeso(s.price)}{s.durationMode==="flexible"&&s.pricingMode==="hourly"?"/hr":""}</div>
                     </div>
                     <div style={{fontSize:12,color:"#9ca3af",marginTop:3}}>{s.durationMode==="flexible" ? (s.pricingMode==="hourly"?"Flexible duration · billed hourly":"Flexible duration") : (s.durationMinutes ? `${s.durationMinutes} min` : "")}</div>
                   </button>
@@ -303,7 +303,7 @@ export default function BookingApp() {
               <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:6,marginBottom:18}}>
                 {dateOptions.map(d => (
                   <button key={d.key} disabled={!d.open} onClick={() => { setDate(d.key); setTime(null); setEndTime(null); setRangeStart(null); }}
-                    style={{flex:"0 0 auto",padding:"10px 14px",borderRadius:10,border:date===d.key?"1px solid #0d9488":"1px solid #e5e7eb",background:date===d.key?"#0d9488":d.open?"#fff":"#f9fafb",color:date===d.key?"#fff":d.open?"#374151":"#d1d5db",cursor:d.open?"pointer":"not-allowed",fontSize:12,fontWeight:700,whiteSpace:"nowrap"}}>
+                    style={{flex:"0 0 auto",padding:"10px 14px",borderRadius:10,border:date===d.key?"1px solid #2563EB":"1px solid #e5e7eb",background:date===d.key?"#2563EB":d.open?"#fff":"#f9fafb",color:date===d.key?"#fff":d.open?"#374151":"#d1d5db",cursor:d.open?"pointer":"not-allowed",fontSize:12,fontWeight:700,whiteSpace:"nowrap"}}>
                     {fmtDateLabel(d.key)}
                   </button>
                 ))}
@@ -321,7 +321,7 @@ export default function BookingApp() {
                         : time===s.time;
                       return (
                         <button key={s.time} disabled={s.taken} onClick={() => pickSlot(s.time)}
-                          style={{padding:"9px 0",borderRadius:9,border:selected?"1px solid #0d9488":"1px solid #e5e7eb",background:s.taken?"#f9fafb":selected?"#0d9488":"#fff",color:s.taken?"#d1d5db":selected?"#fff":"#374151",cursor:s.taken?"not-allowed":"pointer",fontSize:12,fontWeight:700,textDecoration:s.taken?"line-through":"none"}}>
+                          style={{padding:"9px 0",borderRadius:9,border:selected?"1px solid #2563EB":"1px solid #e5e7eb",background:s.taken?"#f9fafb":selected?"#2563EB":"#fff",color:s.taken?"#d1d5db":selected?"#fff":"#374151",cursor:s.taken?"not-allowed":"pointer",fontSize:12,fontWeight:700,textDecoration:s.taken?"line-through":"none"}}>
                           {fmtTimeLabel(s.time)}
                         </button>
                       );
@@ -340,12 +340,12 @@ export default function BookingApp() {
               {store.storePhone && (
                 <div style={{fontSize:12,color:"#9ca3af",marginTop:16}}>
                   Can't find a time that works?{" "}
-                  <a href={`tel:${store.storePhone}`} style={{color:"#0d9488",fontWeight:700,textDecoration:"none"}}>Call us: {store.storePhone}</a>
+                  <a href={`tel:${store.storePhone}`} style={{color:"#2563EB",fontWeight:700,textDecoration:"none"}}>Call us: {store.storePhone}</a>
                 </div>
               )}
 
               <button disabled={!canSubmitSchedule} onClick={() => setStep("details")}
-                style={{width:"100%",marginTop:22,padding:"13px 0",background:canSubmitSchedule?"#0d9488":"#d1fae5",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:canSubmitSchedule?"pointer":"not-allowed"}}>
+                style={{width:"100%",marginTop:22,padding:"13px 0",background:canSubmitSchedule?"#2563EB":"#BFDBFE",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:canSubmitSchedule?"pointer":"not-allowed"}}>
                 Continue
               </button>
             </>
@@ -377,7 +377,7 @@ export default function BookingApp() {
               {error && <div style={{marginTop:14,padding:"10px 14px",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,color:"#b91c1c",fontSize:13}}>{error}</div>}
 
               <button onClick={createBooking} disabled={submitting}
-                style={{width:"100%",marginTop:20,padding:"13px 0",background:"#0d9488",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:"pointer",opacity:submitting?0.7:1}}>
+                style={{width:"100%",marginTop:20,padding:"13px 0",background:"#2563EB",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:"pointer",opacity:submitting?0.7:1}}>
                 {submitting ? "Booking…" : (service.requiresPayment ? "Continue to Payment" : `Confirm ${store.bookingNoun||"Booking"}`)}
               </button>
             </>
@@ -388,11 +388,11 @@ export default function BookingApp() {
               <h2 style={{margin:"0 0 4px",fontSize:18}}>Pay with GCash</h2>
               <p style={{color:"#6b7280",fontSize:13,margin:"0 0 18px"}}>Your slot is held for a short while — send the exact amount below and upload your screenshot to confirm.</p>
 
-              <div style={{background:"#f0fdfa",border:"1px solid #99f6e4",borderRadius:12,padding:16,textAlign:"center",marginBottom:18}}>
-                <div style={{fontSize:12,color:"#0d9488",fontWeight:700,marginBottom:4}}>Amount to send</div>
+              <div style={{background:"#EFF6FF",border:"1px solid #BFDBFE",borderRadius:12,padding:16,textAlign:"center",marginBottom:18}}>
+                <div style={{fontSize:12,color:"#2563EB",fontWeight:700,marginBottom:4}}>Amount to send</div>
                 <div style={{fontSize:26,fontWeight:800,color:"#111"}}>{fmtPeso(amountDue)}</div>
                 {service && time && endTime && pricingBreakdown(service, minutesBetween(time,endTime)) && (
-                  <div style={{fontSize:12,color:"#0d9488",marginTop:4}}>{pricingBreakdown(service, minutesBetween(time,endTime))}</div>
+                  <div style={{fontSize:12,color:"#2563EB",marginTop:4}}>{pricingBreakdown(service, minutesBetween(time,endTime))}</div>
                 )}
               </div>
 
@@ -414,20 +414,20 @@ export default function BookingApp() {
               {error && <div style={{marginTop:14,padding:"10px 14px",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,color:"#b91c1c",fontSize:13}}>{error}</div>}
 
               <button onClick={submitPayment} disabled={submitting || !screenshotPreview}
-                style={{width:"100%",marginTop:20,padding:"13px 0",background:screenshotPreview?"#0d9488":"#d1fae5",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:screenshotPreview?"pointer":"not-allowed",opacity:submitting?0.7:1}}>
+                style={{width:"100%",marginTop:20,padding:"13px 0",background:screenshotPreview?"#2563EB":"#BFDBFE",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:800,cursor:screenshotPreview?"pointer":"not-allowed",opacity:submitting?0.7:1}}>
                 {submitting ? "Submitting…" : "Submit Payment"}
               </button>
               <p style={{fontSize:11,color:"#9ca3af",textAlign:"center",marginTop:14}}>
                 Your reference is <b>{refCode}</b> — save it. If you close this page, come back anytime at{" "}
-                <a href={`/bookings/${slug}/pay?ref=${encodeURIComponent(refCode||"")}`} style={{color:"#0d9488"}}>this link</a> to finish paying.
+                <a href={`/bookings/${slug}/pay?ref=${encodeURIComponent(refCode||"")}`} style={{color:"#2563EB"}}>this link</a> to finish paying.
               </p>
             </>
           )}
 
           {step === "done" && (
             <div style={{textAlign:"center",padding:"10px 0"}}>
-              <div style={{width:64,height:64,borderRadius:"50%",background:"#f0fdfa",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 18px"}}>
-                <i className={`ti ${service?.requiresPayment?"ti-clock":"ti-check"}`} style={{fontSize:32,color:"#0d9488"}}/>
+              <div style={{width:64,height:64,borderRadius:"50%",background:"#EFF6FF",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 18px"}}>
+                <i className={`ti ${service?.requiresPayment?"ti-clock":"ti-check"}`} style={{fontSize:32,color:"#2563EB"}}/>
               </div>
               <h2 style={{margin:"0 0 8px",fontSize:20}}>{service?.requiresPayment ? "Payment submitted!" : `Your ${(store.bookingNoun||"booking").toLowerCase()} is confirmed!`}</h2>
               <p style={{color:"#6b7280",fontSize:14,lineHeight:1.6,marginBottom:16}}>
@@ -491,7 +491,7 @@ const LBL = {display:"block",fontSize:12,fontWeight:700,color:"#374151",marginBo
 const INP = {width:"100%",padding:"11px 14px",borderRadius:10,border:"1px solid #e5e7eb",fontSize:14,boxSizing:"border-box"};
 
 function Centered({children}) {
-  return <div style={{minHeight:"100vh",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",padding:24,textAlign:"center",background:"#f1f8f6"}}><div>{children}</div></div>;
+  return <div style={{minHeight:"100vh",boxSizing:"border-box",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",padding:24,textAlign:"center",background:"#EFF6FF"}}><div>{children}</div></div>;
 }
 function Empty({text}) {
   return <div style={{textAlign:"center",padding:"20px 0",color:"#9ca3af",fontSize:13}}>{text}</div>;

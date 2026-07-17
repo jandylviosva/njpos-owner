@@ -5,18 +5,18 @@
 // just confirm by phone as usual.
 
 const ALLOWED_ORIGINS = [
-  "https://pospro-portal.vercel.app",
-  "https://www.pospro-portal.com",
-  "https://pospro-portal.com",
-  "https://client.pospro-portal.com",
-  "https://pwa.pospro-portal.com",
+  "https://owner.nj-systems.com",
+  "https://pos.nj-systems.com",
+  "https://dev.nj-systems.com",
+  "https://nj-systems.com",
+  "https://www.nj-systems.com",
 ];
 
 function setCorsHeaders(req, res) {
   const origin = req.headers.origin || "";
   const allowed =
     ALLOWED_ORIGINS.includes(origin) ||
-    /^https:\/\/pospro(-portal|-pwa)?(-[a-z0-9]+)?\.vercel\.app$/.test(origin);
+    /^https:\/\/njpos(-portal|-owner|-pwa|-dev|-landing)?(-[a-z0-9]+)?\.vercel\.app$/.test(origin);
   if (allowed) res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -27,7 +27,7 @@ async function sendResendEmail(RESEND_KEY, { to, subject, html }) {
   return fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${RESEND_KEY}` },
-    body: JSON.stringify({ from: "POS Pro <noreply@pospro-portal.com>", to: Array.isArray(to) ? to : [to], subject, html }),
+    body: JSON.stringify({ from: "NJ POS <noreply@mail.nj-systems.com>", reply_to: "pos_support@nj-systems.com", to: Array.isArray(to) ? to : [to], subject, html }),
   });
 }
 
@@ -68,11 +68,11 @@ export default async function handler(req, res) {
   ];
 
   const html = `<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f9fafb">
-    <div style="background:#0d9488;border-radius:12px;padding:20px;text-align:center;margin-bottom:20px">
+    <div style="background:#2563EB;border-radius:12px;padding:20px;text-align:center;margin-bottom:20px">
       <div style="color:#fff;font-size:20px;font-weight:800">${storeName||`Your ${noun.toLowerCase()}`}</div>
     </div>
     <div style="background:#fff;border-radius:12px;padding:24px;border:1px solid #e5e7eb">
-      <div style="color:#0d9488;font-weight:700;font-size:13px;margin-bottom:10px">${reschedule?`↻ ${noun} Moved`:"✓ Payment Confirmed"}</div>
+      <div style="color:#2563EB;font-weight:700;font-size:13px;margin-bottom:10px">${reschedule?`↻ ${noun} Moved`:"✓ Payment Confirmed"}</div>
       <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 18px">Hi ${customerFirstName||"there"},<br/>${reschedule?`Your ${noun.toLowerCase()} has been moved to a new time.`:`Your payment has been verified and your ${noun.toLowerCase()} is now confirmed.`}</p>
       <table style="width:100%;border-collapse:collapse;font-size:13px">
         ${rows.map(([label,val])=>`<tr><td style="padding:6px 0;color:#6b7280">${label}</td><td style="padding:6px 0;color:#111;text-align:right;font-weight:700">${val}</td></tr>`).join("")}

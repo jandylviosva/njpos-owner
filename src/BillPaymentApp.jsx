@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 
 const QR_IMAGE_URL = "/gcash-qr.jpg";
 const GCASH_NUMBER = "0956-013-7170";
-const LANDING_PAGE_URL = "https://www.pospro-portal.com";
+const LANDING_PAGE_URL = "https://www.nj-systems.com";
 
 const fmt = (n) => `₱${Number(n || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -49,7 +49,7 @@ export default function BillPaymentApp() {
   const downloadQr = () => {
     const a = document.createElement("a");
     a.href = QR_IMAGE_URL;
-    a.download = "pospro-gcash-qr.jpg";
+    a.download = "njpos-gcash-qr.jpg";
     a.click();
   };
 
@@ -99,9 +99,9 @@ export default function BillPaymentApp() {
       <div style={{ maxWidth: 480, margin: "0 auto" }}>
         <div style={{ textAlign: "center", marginBottom: 30 }}>
           <div style={{ width: 56, height: 56, borderRadius: 14, overflow: "hidden", margin: "0 auto 12px" }}>
-            <img src="/icons/icon-192.png" alt="POS Pro" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <img src="/icons/icon-192.png" alt="NJ POS" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           </div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#111" }}>POS Pro</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#111" }}>NJ POS</div>
         </div>
 
         <div style={{ background: "#fff", borderRadius: 18, padding: "30px 26px", boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}>
@@ -124,12 +124,12 @@ export default function BillPaymentApp() {
                       <tr><td colSpan={2} style={{ borderTop: "1px solid #ddd6fe", paddingTop: 8 }} /></tr>
                       <tr>
                         <td style={{ fontWeight: 800, fontSize: 16, color: "#111" }}>Total</td>
-                        <td style={{ fontWeight: 800, fontSize: 16, color: "#4f46e5", textAlign: "right", whiteSpace: "nowrap" }}>{fmt(lockedAmount)}</td>
+                        <td style={{ fontWeight: 800, fontSize: 16, color: "#2563EB", textAlign: "right", whiteSpace: "nowrap" }}>{fmt(lockedAmount)}</td>
                       </tr>
                     </tbody>
                   </table>
                 ) : (
-                  <div style={{ fontWeight: 800, fontSize: 24, color: "#4f46e5", textAlign: "center" }}>{fmt(lockedAmount)}</div>
+                  <div style={{ fontWeight: 800, fontSize: 24, color: "#2563EB", textAlign: "center" }}>{fmt(lockedAmount)}</div>
                 )}
               </div>
 
@@ -137,7 +137,7 @@ export default function BillPaymentApp() {
                 <img src={QR_IMAGE_URL} alt="GCash QR" style={{ width: 200, height: 200, borderRadius: 12, border: "1px solid #e5e7eb" }} />
                 <div style={{ marginTop: 10, fontSize: 14, fontWeight: 700, color: "#374151" }}>
                   GCash: {GCASH_NUMBER}
-                  <button onClick={copyGcash} title="Copy number" style={{ marginLeft: 8, background: "none", border: "none", cursor: "pointer", color: "#4f46e5", verticalAlign: "middle" }}>
+                  <button onClick={copyGcash} title="Copy number" style={{ marginLeft: 8, background: "none", border: "none", cursor: "pointer", color: "#2563EB", verticalAlign: "middle" }}>
                     <i className="ti ti-copy" />
                   </button>
                 </div>
@@ -164,7 +164,7 @@ export default function BillPaymentApp() {
 
               {error && <div style={{ marginTop: 14, padding: "10px 14px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, color: "#b91c1c", fontSize: 13 }}>{error}</div>}
 
-              <button onClick={submit} disabled={submitting} style={{ width: "100%", marginTop: 20, padding: "13px 0", background: "#4f46e5", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: "pointer", opacity: submitting ? 0.7 : 1 }}>
+              <button onClick={submit} disabled={submitting} style={{ width: "100%", marginTop: 20, padding: "13px 0", background: "#2563EB", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: "pointer", opacity: submitting ? 0.7 : 1 }}>
                 {submitting ? "Submitting…" : "Complete Payment"}
               </button>
             </>
@@ -177,7 +177,7 @@ export default function BillPaymentApp() {
               <p style={{ color: "#6b7280", fontSize: 14, lineHeight: 1.6 }}>
                 We've received your payment for <b>{storeName}</b>. Once confirmed, your account stays active — no further action needed.
               </p>
-              <button onClick={() => window.location.href = LANDING_PAGE_URL} style={{ marginTop: 20, padding: "12px 28px", background: "#4f46e5", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
+              <button onClick={() => window.location.href = LANDING_PAGE_URL} style={{ marginTop: 20, padding: "12px 28px", background: "#2563EB", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: "pointer" }}>
                 Return to Homepage
               </button>
               <p style={{ color: "#9ca3af", fontSize: 12, marginTop: 14 }}>Redirecting automatically in {redirectIn}s…</p>

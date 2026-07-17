@@ -3,19 +3,18 @@
 // notifies developer. Called from the PWA "Try for Free" flow.
 
 const ALLOWED_ORIGINS = [
-  "https://pospro-portal.vercel.app",
-  "https://pospro-pwa.vercel.app",
-  "https://pwa.pospro-portal.com",
-  "https://www.pospro-portal.com",
-  "https://pospro-portal.com",
-  "https://client.pospro-portal.com",
+  "https://owner.nj-systems.com",
+  "https://pos.nj-systems.com",
+  "https://dev.nj-systems.com",
+  "https://nj-systems.com",
+  "https://www.nj-systems.com",
 ];
 
 function setCorsHeaders(req, res) {
   const origin = req.headers.origin || "";
   const allowed =
     ALLOWED_ORIGINS.includes(origin) ||
-    /^https:\/\/pospro(-portal|-pwa)?(-[a-z0-9]+)?\.vercel\.app$/.test(origin);
+    /^https:\/\/njpos(-portal|-owner|-pwa|-dev|-landing)?(-[a-z0-9]+)?\.vercel\.app$/.test(origin);
   if (allowed) res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -56,7 +55,8 @@ async function sendEmail(to, subject, html, resendKey) {
       "Authorization": `Bearer ${resendKey}`,
     },
     body: JSON.stringify({
-      from: "POS Pro <noreply@pospro-portal.com>",
+      from: "NJ POS <noreply@mail.nj-systems.com>",
+      reply_to: "pos_support@nj-systems.com",
       to: [to],
       subject,
       html,
@@ -135,30 +135,30 @@ export default async function handler(req, res) {
 
     await sendEmail(
       cleanEmail,
-      "Your POS Pro Trial Activation Code",
+      "Your NJ POS Trial Activation Code",
       `
       <div style="font-family:sans-serif;max-width:460px;margin:0 auto;padding:24px">
-        <div style="background:#4f46e5;border-radius:12px;padding:18px;text-align:center;margin-bottom:20px">
-          <div style="color:#fff;font-size:20px;font-weight:800">POS Pro</div>
+        <div style="background:#2563EB;border-radius:12px;padding:18px;text-align:center;margin-bottom:20px">
+          <div style="color:#fff;font-size:20px;font-weight:800">NJ POS</div>
           <div style="color:rgba(255,255,255,0.6);font-size:12px">3-Day Free Trial</div>
         </div>
         <h2 style="font-size:16px;color:#111;margin-bottom:6px">Hi ${ownerName}! 👋</h2>
         <p style="color:#6b7280;font-size:13px;margin-bottom:18px">
-          Your free trial for <b>${storeName}</b> is ready. Use the code below to activate POS Pro.
+          Your free trial for <b>${storeName}</b> is ready. Use the code below to activate NJ POS.
         </p>
-        <div style="background:#f5f3ff;border:2px solid #4f46e5;border-radius:12px;padding:18px;text-align:center;margin-bottom:18px">
+        <div style="background:#f5f3ff;border:2px solid #2563EB;border-radius:12px;padding:18px;text-align:center;margin-bottom:18px">
           <div style="font-size:11px;color:#6b7280;font-weight:700;letter-spacing:1px;margin-bottom:8px">YOUR TRIAL CODE</div>
-          <div style="font-size:24px;font-weight:800;letter-spacing:4px;color:#4f46e5;font-family:monospace">${trialCode}</div>
+          <div style="font-size:24px;font-weight:800;letter-spacing:4px;color:#2563EB;font-family:monospace">${trialCode}</div>
         </div>
         <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:12px 14px;margin-bottom:18px;font-size:12px;color:#92400e">
           ⏳ <b>Trial expires:</b> ${expiryDate} (3 days from now)
         </div>
-        <a href="https://pwa.pospro-portal.com" style="display:block;text-align:center;background:#4f46e5;color:#fff;text-decoration:none;font-size:15px;font-weight:800;padding:14px;border-radius:10px;margin-bottom:18px;box-shadow:0 4px 12px rgba(79,70,229,0.35)">
-          🚀 Open POS Pro App →
+        <a href="https://pos.nj-systems.com" style="display:block;text-align:center;background:#2563EB;color:#fff;text-decoration:none;font-size:15px;font-weight:800;padding:14px;border-radius:10px;margin-bottom:18px;box-shadow:0 4px 12px rgba(37,99,235,0.35)">
+          🚀 Open NJ POS App →
         </a>
         <p style="color:#6b7280;font-size:13px;margin-bottom:8px"><b>How to activate:</b></p>
         <ol style="color:#6b7280;font-size:13px;padding-left:18px;line-height:1.8">
-          <li>Click <b>"Open POS Pro App"</b> above or go to <a href="https://pwa.pospro-portal.com" style="color:#4f46e5;font-weight:600">pwa.pospro-portal.com</a></li>
+          <li>Click <b>"Open NJ POS App"</b> above or go to <a href="https://pos.nj-systems.com" style="color:#2563EB;font-weight:600">pos.nj-systems.com</a></li>
           <li>Enter your email: <b>${cleanEmail}</b></li>
           <li>Enter your trial code when prompted</li>
           <li>Set up your store details and start selling</li>
@@ -186,13 +186,13 @@ export default async function handler(req, res) {
         `
         <div style="font-family:sans-serif;max-width:400px;margin:0 auto;padding:24px">
           <div style="background:#0f172a;border-radius:12px;padding:16px;margin-bottom:16px">
-            <div style="color:#818cf8;font-size:18px;font-weight:800">POS Pro Dev Console</div>
+            <div style="color:#818cf8;font-size:18px;font-weight:800">NJ POS Dev Console</div>
             <div style="color:#6b7280;font-size:11px">New Trial Notification</div>
           </div>
           <table style="width:100%;border-collapse:collapse;font-size:13px">
             <tr><td style="padding:8px 0;color:#6b7280;font-weight:700;width:120px">Store Name</td><td style="padding:8px 0;color:#111;font-weight:700">${storeName}</td></tr>
             <tr><td style="padding:8px 0;color:#6b7280;font-weight:700">Owner</td><td style="padding:8px 0;color:#111">${ownerName}</td></tr>
-            <tr><td style="padding:8px 0;color:#6b7280;font-weight:700">Email</td><td style="padding:8px 0;color:#4f46e5">${cleanEmail}</td></tr>
+            <tr><td style="padding:8px 0;color:#6b7280;font-weight:700">Email</td><td style="padding:8px 0;color:#2563EB">${cleanEmail}</td></tr>
             <tr><td style="padding:8px 0;color:#6b7280;font-weight:700">Trial Code</td><td style="padding:8px 0;color:#111;font-family:monospace;font-weight:800">${trialCode}</td></tr>
             <tr><td style="padding:8px 0;color:#6b7280;font-weight:700">Expires</td><td style="padding:8px 0;color:#d97706">${expiryDate}</td></tr>
             <tr><td style="padding:8px 0;color:#6b7280;font-weight:700">Started</td><td style="padding:8px 0;color:#111">${new Date().toLocaleString("en-PH")}</td></tr>

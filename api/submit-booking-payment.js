@@ -1,25 +1,25 @@
 // Vercel Serverless Function — the public /bookings/{slug} payment step
 // submits here after the customer uploads their GCash screenshot. This is
 // NOT the same money flow as submit-bill-payment.js (that's a store owner
-// paying POS Pro's own subscription fee, to POS Pro's own GCash). This is a
+// paying NJ POS's own subscription fee, to NJ POS's own GCash). This is a
 // customer paying the STORE, to the STORE's own GCash — so it never touches
 // payment_records or the Dev Console at all. The proof just gets attached to
 // the booking itself in store_data.bookings, and the STORE OWNER (not POS
 // Pro's team) gets notified to review it in their own PWA.
 
 const ALLOWED_ORIGINS = [
-  "https://pospro-portal.vercel.app",
-  "https://www.pospro-portal.com",
-  "https://pospro-portal.com",
-  "https://client.pospro-portal.com",
-  "https://pwa.pospro-portal.com",
+  "https://owner.nj-systems.com",
+  "https://pos.nj-systems.com",
+  "https://dev.nj-systems.com",
+  "https://nj-systems.com",
+  "https://www.nj-systems.com",
 ];
 
 function setCorsHeaders(req, res) {
   const origin = req.headers.origin || "";
   const allowed =
     ALLOWED_ORIGINS.includes(origin) ||
-    /^https:\/\/pospro(-portal|-pwa)?(-[a-z0-9]+)?\.vercel\.app$/.test(origin);
+    /^https:\/\/njpos(-portal|-owner|-pwa|-dev|-landing)?(-[a-z0-9]+)?\.vercel\.app$/.test(origin);
   if (allowed) res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -67,7 +67,7 @@ async function sendResendEmail(RESEND_KEY, { to, subject, html }) {
   return fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${RESEND_KEY}` },
-    body: JSON.stringify({ from: "POS Pro <noreply@pospro-portal.com>", to: Array.isArray(to) ? to : [to], subject, html }),
+    body: JSON.stringify({ from: "NJ POS <noreply@mail.nj-systems.com>", reply_to: "pos_support@nj-systems.com", to: Array.isArray(to) ? to : [to], subject, html }),
   });
 }
 
@@ -117,7 +117,7 @@ export default async function handler(req, res) {
             to: store.owner_email,
             subject: `Payment submitted — ${booking.serviceName} for ${booking.customerName}`,
             html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px">
-              <p style="font-size:14px;color:#374151">A customer submitted a GCash payment for a booking on your online booking page. Open the Bookings tab in your POS Pro app to review the screenshot and confirm.</p>
+              <p style="font-size:14px;color:#374151">A customer submitted a GCash payment for a booking on your online booking page. Open the Bookings tab in your NJ POS app to review the screenshot and confirm.</p>
               <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px;padding:16px;font-size:13px;color:#374151">
                 <div><b>${booking.serviceName}</b></div>
                 <div>${booking.date}${booking.time?` at ${booking.time}`:""}</div>

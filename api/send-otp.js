@@ -15,13 +15,11 @@
 import crypto from "node:crypto";
 
 const ALLOWED_ORIGINS = [
-  "https://pospro-portal.vercel.app",
-  "https://pospro-portal-izm3duem8-jandyls-projects.vercel.app",
-  "https://www.pospro-portal.com",
-  "https://pospro-portal.com",
-  "https://pospro-pwa.vercel.app",
-  "https://pwa.pospro-portal.com",
-  "https://client.pospro-portal.com",
+  "https://owner.nj-systems.com",
+  "https://pos.nj-systems.com",
+  "https://dev.nj-systems.com",
+  "https://nj-systems.com",
+  "https://www.nj-systems.com",
 ];
 
 function setCorsHeaders(req, res) {
@@ -29,7 +27,7 @@ function setCorsHeaders(req, res) {
   // Allow any vercel.app subdomain for your projects, or exact matches
   const allowed =
     ALLOWED_ORIGINS.includes(origin) ||
-    /^https:\/\/pospro(-portal|-pwa)?(-[a-z0-9]+)?\.vercel\.app$/.test(origin);
+    /^https:\/\/njpos(-portal|-owner|-pwa|-dev|-landing)?(-[a-z0-9]+)?\.vercel\.app$/.test(origin);
 
   if (allowed) {
     res.setHeader("Access-Control-Allow-Origin", origin);
@@ -61,7 +59,7 @@ async function sendResendEmail(RESEND_KEY, { to, subject, html }) {
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${RESEND_KEY}` },
-    body: JSON.stringify({ from: "POS Pro <noreply@pospro-portal.com>", to: [to], subject, html }),
+    body: JSON.stringify({ from: "NJ POS <noreply@mail.nj-systems.com>", reply_to: "pos_support@nj-systems.com", to: [to], subject, html }),
   });
   return r;
 }
@@ -93,15 +91,15 @@ export default async function handler(req, res) {
     try {
       const r = await sendResendEmail(RESEND_KEY, {
         to: email,
-        subject: `POS Pro Report: ${reportTitle||"Report"}${storeName ? " — " + storeName : ""}`,
+        subject: `NJ POS Report: ${reportTitle||"Report"}${storeName ? " — " + storeName : ""}`,
         html: `<div style="font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:24px">
-          <div style="background:#4f46e5;border-radius:12px;padding:18px;text-align:center;margin-bottom:20px">
-            <div style="color:#fff;font-size:20px;font-weight:800">POS Pro</div>
+          <div style="background:#2563EB;border-radius:12px;padding:18px;text-align:center;margin-bottom:20px">
+            <div style="color:#fff;font-size:20px;font-weight:800">NJ POS</div>
             <div style="color:rgba(255,255,255,0.6);font-size:12px">${storeName||"Store Report"}</div>
           </div>
           <h2 style="font-size:16px;color:#111;margin-bottom:16px">${reportTitle||"Report"}</h2>
           ${reportHtml}
-          <p style="color:#9ca3af;font-size:11px;margin-top:24px">This report was generated from POS Pro and sent to your registered email.</p>
+          <p style="color:#9ca3af;font-size:11px;margin-top:24px">This report was generated from NJ POS and sent to your registered email.</p>
           <div style="margin-top:12px;padding:10px 14px;background:#f5f3ff;border-radius:8px;font-size:11px;color:#5b21b6">
             💡 <b>To save as PDF:</b> Open the POS app → Reports → View Report → Save as PDF
           </div>
@@ -121,11 +119,11 @@ export default async function handler(req, res) {
     try {
       const r = await sendResendEmail(RESEND_KEY, {
         to: email,
-        subject: "Your POS Pro Trial Has Expired",
+        subject: "Your NJ POS Trial Has Expired",
         html: `
           <div style="font-family:sans-serif;max-width:460px;margin:0 auto;padding:24px">
-            <div style="background:#4f46e5;border-radius:12px;padding:18px;text-align:center;margin-bottom:20px">
-              <div style="color:#fff;font-size:20px;font-weight:800">POS Pro</div>
+            <div style="background:#2563EB;border-radius:12px;padding:18px;text-align:center;margin-bottom:20px">
+              <div style="color:#fff;font-size:20px;font-weight:800">NJ POS</div>
               <div style="color:rgba(255,255,255,0.6);font-size:12px">${storeName||"Your Store"}</div>
             </div>
             <h2 style="font-size:16px;color:#111;margin-bottom:8px">Your free trial has ended ⏰</h2>
@@ -134,9 +132,9 @@ export default async function handler(req, res) {
               Your store data is fully preserved — you just need an activation code to continue.
             </p>
             <div style="background:#f5f3ff;border:2px solid #c4b5fd;border-radius:12px;padding:16px;margin-bottom:16px">
-              <div style="font-weight:800;font-size:14px;color:#5b21b6;margin-bottom:8px">To continue using POS Pro:</div>
+              <div style="font-weight:800;font-size:14px;color:#5b21b6;margin-bottom:8px">To continue using NJ POS:</div>
               <ol style="color:#6b7280;font-size:13px;padding-left:16px;margin:0;line-height:1.8">
-                <li>Contact your POS Pro provider</li>
+                <li>Contact your NJ POS provider</li>
                 <li>Purchase a permanent activation code</li>
                 <li>Enter the code on the POS app to unlock your store</li>
               </ol>
@@ -182,9 +180,9 @@ export default async function handler(req, res) {
     }
 
     const subjects = {
-      "sign-in": "Your POS Pro sign-in code",
-      "reset":   "Reset your POS Pro portal password",
-      "device":  "POS Pro device verification code",
+      "sign-in": "Your NJ POS sign-in code",
+      "reset":   "Reset your NJ POS portal password",
+      "device":  "NJ POS device verification code",
     };
     const subject = subjects[purpose] || subjects["sign-in"];
 
@@ -194,16 +192,16 @@ export default async function handler(req, res) {
         subject,
         html: `
           <div style="font-family:sans-serif;max-width:420px;margin:0 auto;padding:24px">
-            <div style="background:#4f46e5;border-radius:12px;padding:18px;text-align:center;margin-bottom:20px">
-              <div style="color:#fff;font-size:20px;font-weight:800">POS Pro</div>
+            <div style="background:#2563EB;border-radius:12px;padding:18px;text-align:center;margin-bottom:20px">
+              <div style="color:#fff;font-size:20px;font-weight:800">NJ POS</div>
               <div style="color:rgba(255,255,255,0.6);font-size:12px">${storeName || store.store_name || "Owner Portal"}</div>
             </div>
             <h2 style="font-size:16px;color:#111;margin-bottom:6px">${subject}</h2>
             <p style="color:#6b7280;font-size:13px;margin-bottom:18px">
               Use this code to continue. It expires in <b>10 minutes</b>.
             </p>
-            <div style="background:#f5f3ff;border:2px solid #4f46e5;border-radius:12px;padding:18px;text-align:center;margin-bottom:18px">
-              <div style="font-size:34px;font-weight:800;letter-spacing:8px;color:#4f46e5">${otp}</div>
+            <div style="background:#f5f3ff;border:2px solid #2563EB;border-radius:12px;padding:18px;text-align:center;margin-bottom:18px">
+              <div style="font-size:34px;font-weight:800;letter-spacing:8px;color:#2563EB">${otp}</div>
             </div>
             <p style="color:#9ca3af;font-size:11px">
               If you didn't request this code, you can safely ignore this email.
