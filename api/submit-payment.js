@@ -150,7 +150,7 @@ export default async function handler(req, res) {
         // all instead of neatly right-aligned. Tables are the old-school
         // but genuinely reliable way to lay out HTML email.
         html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f9fafb">
-          <div style="background:#2563EB;border-radius:12px;padding:20px;text-align:center;margin-bottom:24px">
+          <div style="background:#0F172A;border-radius:12px;padding:20px;text-align:center;margin-bottom:24px">
             <img src="https://owner.nj-systems.com/email-logo.png" alt="NJ POS" width="183" height="55" style="display:block;margin:0 auto;"/>
           </div>
           <div style="background:#fff;border-radius:12px;padding:24px;border:1px solid #e5e7eb">
