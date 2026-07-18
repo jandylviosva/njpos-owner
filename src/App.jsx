@@ -349,9 +349,24 @@ export default function App(){
   useEffect(()=>{
     if(session?.storeId){
       loadData(session.storeId);
-      refreshRef.current=setInterval(()=>loadData(session.storeId),15000);
+      // 60s instead of 15s — a dashboard doesn't need near-realtime
+      // freshness, and this alone was generating ~17,000 requests/day
+      // per open tab (3 queries × 4/min) even with nobody looking at it.
+      // Also skip the tick entirely while the tab is backgrounded/
+      // minimized — there's no one to show fresher data to — and catch
+      // up with one immediate refresh the moment it's visible again,
+      // so the owner never sees stale data just because they tabbed away.
+      refreshRef.current=setInterval(()=>{
+        if(document.hidden) return;
+        loadData(session.storeId);
+      },60000);
+      const onVisible=()=>{ if(!document.hidden) loadData(session.storeId); };
+      document.addEventListener("visibilitychange",onVisible);
+      return()=>{
+        clearInterval(refreshRef.current);
+        document.removeEventListener("visibilitychange",onVisible);
+      };
     }
-    return()=>clearInterval(refreshRef.current);
   },[session,loadData]);
 
   // Save field — update Supabase and local data immediately
