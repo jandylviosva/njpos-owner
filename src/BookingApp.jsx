@@ -12,7 +12,8 @@ const getWorkingHours = (resource, storeDefaultHours, dayKey) => {
 const addMinutes = (time, mins) => {
   const [h,m] = time.split(":").map(Number);
   const total = h*60+m+mins;
-  const hh = Math.floor((total%1440)/60), mm = total%60;
+  if(total >= 1440) return "24:00"; // clamp, don't wrap — see PWA App.jsx addMinutes comment
+  const hh = Math.floor(total/60), mm = total%60;
   return `${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`;
 };
 const minutesBetween = (start, end) => {
@@ -33,11 +34,25 @@ const generateSlots = (workingHours, slotIncrementMinutes, durationMinutes) => {
   }
   return slots;
 };
-const hasBookingConflict = (bookings, resourceId, date, time, durationMinutes) => {
-  if(!resourceId || !time) return false;
+// Mirrors the PWA's findBookingConflict and create-booking.js's hasConflict
+// — keep all three in sync. Blocks (isBlock) hit every resource when their
+// resourceId is null and their whole day when their time is null; exclusive
+// services with no resource conflict against other bookings of the same
+// service. (The bookings array here is the server's stripped-down public
+// view — expired holds are already filtered out server-side.)
+const hasBookingConflict = (bookings, resourceId, date, time, durationMinutes, serviceId) => {
+  if(!time) return false;
   const newEnd = addMinutes(time, durationMinutes||30);
   return bookings.some(b=>{
-    if(b.resourceId!==resourceId || b.date!==date || !b.time) return false;
+    if(b.date!==date) return false;
+    const scopeMatch = b.isBlock
+      ? (!b.resourceId || (resourceId && b.resourceId===resourceId))
+      : (resourceId
+          ? b.resourceId===resourceId
+          : (serviceId ? (!b.resourceId && b.serviceId===serviceId) : false));
+    if(!scopeMatch) return false;
+    if(b.isBlock && !b.time) return true; // all-day block
+    if(!b.time) return false;
     const bEnd = addMinutes(b.time, b.durationMinutes||30);
     return time < bEnd && b.time < newEnd;
   });
@@ -93,6 +108,7 @@ export default function BookingApp() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [notes, setNotes] = useState("");
+  const [website, setWebsite] = useState(""); // honeypot — invisible to humans; bots that auto-fill it get quietly rejected server-side
   const [submitting, setSubmitting] = useState(false);
 
   const [bookingId, setBookingId] = useState(null);
@@ -137,17 +153,25 @@ export default function BookingApp() {
     if (!service || !date || !service.exclusivity) return [];
     const dayKey = dayKeyFor(date);
     const hours = getWorkingHours(resource, store.defaultHours, dayKey);
-    const raw = generateSlots(hours, service.slotIncrementMinutes || 30, service.durationMinutes || service.slotIncrementMinutes || 30);
-    if (!resourceId) return raw.map(t => ({ time: t, taken: false }));
+    let raw = generateSlots(hours, service.slotIncrementMinutes || 30, service.durationMinutes || service.slotIncrementMinutes || 30);
+    // No booking slots in the past: for today, drop anything at or before
+    // the current time (the server enforces this too).
+    if (date === toLocalDateKey(new Date())) {
+      const now = new Date();
+      const nowHHMM = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+      raw = raw.filter(t => t > nowHHMM);
+    }
+    // taken is now computed for EVERY exclusive service — blocks and
+    // service-level conflicts apply even when no resource is selected.
     return raw.map(t => ({
       time: t,
-      taken: hasBookingConflict(store.bookings, resourceId, date, t, service.durationMinutes || service.slotIncrementMinutes || 30),
+      taken: hasBookingConflict(store.bookings, resourceId, date, t, service.durationMinutes || service.slotIncrementMinutes || 30, service.id),
     }));
   }, [service, date, resource, resourceId, store]);
 
   const pickSlot = (t) => {
     if (service.durationMode !== "flexible") { setTime(t); setEndTime(null); return; }
-    if (!rangeStart) { setRangeStart(t); setTime(t); setEndTime(null); return; }
+    if (!rangeStart) { setRangeStart(t); setTime(t); setEndTime(null); setError(""); return; }
     if (t === rangeStart) {
       // Tapped the same slot twice — treat it as "just this one slot's length."
       setTime(t); setEndTime(addMinutes(t, service.slotIncrementMinutes || 30)); setRangeStart(null);
@@ -155,6 +179,15 @@ export default function BookingApp() {
     }
     const start = rangeStart < t ? rangeStart : t;
     const end = rangeStart < t ? t : rangeStart;
+    // A range spanning a slot someone else already holds used to sail
+    // through here and only bounce off the server at submit — catch it
+    // now, while the customer is still looking at the grid.
+    if (hasBookingConflict(store.bookings, resourceId, date, start, minutesBetween(start, end), service.id)) {
+      setError("That range includes a time that's already taken — pick a range around it.");
+      setRangeStart(null); setTime(null); setEndTime(null);
+      return;
+    }
+    setError("");
     setTime(start); setEndTime(end); setRangeStart(null);
   };
 
@@ -174,6 +207,7 @@ export default function BookingApp() {
           slug, serviceId, resourceId, date, time, endTime,
           customerFirstName: customerFirstName.trim(), customerLastName: customerLastName.trim(),
           customerPhone: customerPhone.trim(), customerEmail: customerEmail.trim(), notes,
+          website, // honeypot
         }),
       });
       const data = await res.json();
@@ -373,6 +407,11 @@ export default function BookingApp() {
               <input value={customerEmail} onChange={e=>setCustomerEmail(e.target.value)} style={INP} placeholder="For your booking confirmation"/>
               <label style={LBL}>Notes (optional)</label>
               <input value={notes} onChange={e=>setNotes(e.target.value)} style={INP} placeholder="Anything the store should know"/>
+              {/* Honeypot — visually removed and untabbable; only autofill bots ever touch it */}
+              <div aria-hidden="true" style={{position:"absolute",left:"-9999px",top:"auto",width:1,height:1,overflow:"hidden"}}>
+                <label>Website</label>
+                <input tabIndex={-1} autoComplete="off" value={website} onChange={e=>setWebsite(e.target.value)}/>
+              </div>
 
               {error && <div style={{marginTop:14,padding:"10px 14px",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,color:"#b91c1c",fontSize:13}}>{error}</div>}
 

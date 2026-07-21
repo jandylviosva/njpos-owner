@@ -246,7 +246,34 @@ export default async function handler(req, res) {
       body: JSON.stringify({ otp_code: null, otp_expiry: null }),
     });
 
-    return res.status(200).json({ ok: true });
+    // ── OWNER PASSWORD HASH (post-verification only) ──
+    // The PWA's device-restore flow needs the owner's password hash to seed
+    // the local owner account when the cloud's accounts list is empty. It
+    // used to read stores.owner_password directly from the browser with the
+    // public anon key — meaning ANYONE could fetch any store's credential
+    // by email. Now it's released only here, only after the owner has just
+    // proven control of the inbox, and only ever as a bcrypt hash.
+    //
+    // Lazy migration: any store still carrying a legacy PLAINTEXT password
+    // (pre-bcrypt rows) gets it hashed and written back the first time its
+    // owner completes an OTP — so the plaintext copies age out of the
+    // database without a risky one-shot migration.
+    let ownerPasswordHash = store.owner_password || null;
+    if (ownerPasswordHash && !ownerPasswordHash.startsWith("$2")) {
+      try {
+        const bcrypt = (await import("bcryptjs")).default;
+        const hashed = await bcrypt.hash(ownerPasswordHash, 10);
+        ownerPasswordHash = hashed; // hash in-memory FIRST — plaintext never leaves the server even if the persist below fails
+        await supaStores(`?owner_email=eq.${encodeURIComponent(cleanEmail)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ owner_password: hashed }),
+        }).catch(() => {}); // persist failure is non-fatal — migrated for real on a later OTP
+      } catch {
+        ownerPasswordHash = null; // can't hash → withhold rather than ever sending plaintext
+      }
+    }
+
+    return res.status(200).json({ ok: true, ownerPasswordHash });
   }
 
   return res.status(400).json({ error: "Unknown action" });

@@ -41,6 +41,19 @@ async function supa(path, init) {
   });
 }
 
+// Best-effort per-IP rate limit — in-memory per serverless instance (see
+// the identical helper in create-booking.js for the honest caveats).
+const rateBuckets = new Map();
+const rateLimited = (ip, max, windowMs) => {
+  const now = Date.now();
+  const arr = (rateBuckets.get(ip) || []).filter(t => now - t < windowMs);
+  if (arr.length >= max) { rateBuckets.set(ip, arr); return true; }
+  arr.push(now);
+  rateBuckets.set(ip, arr);
+  if (rateBuckets.size > 5000) rateBuckets.clear();
+  return false;
+};
+
 async function uploadScreenshot(base64DataUrl, bookingId) {
   const match = /^data:(image\/[a-zA-Z+]+);base64,(.+)$/.exec(base64DataUrl || "");
   if (!match) throw new Error("Invalid image data");
@@ -80,6 +93,12 @@ export default async function handler(req, res) {
   if (!slug) return res.status(400).json({ error: "Missing store" });
   if (!bookingId) return res.status(400).json({ error: "Missing booking" });
   if (!screenshotBase64) return res.status(400).json({ error: "Missing payment screenshot" });
+  // ~8M base64 chars ≈ 6MB of image — far more than any phone screenshot
+  // needs, small enough to stop someone shoveling junk into storage.
+  if (String(screenshotBase64).length > 8_000_000) return res.status(413).json({ error: "That image is too large — please upload a smaller screenshot" });
+
+  const ip = String(req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "?").split(",")[0].trim();
+  if (rateLimited(ip, 10, 10 * 60 * 1000)) return res.status(429).json({ error: "Too many attempts — please wait a few minutes and try again." });
 
   const storeRows = await (await supa(`stores?booking_slug=eq.${encodeURIComponent(String(slug).toLowerCase())}&select=id,store_name,owner_email`)).json();
   const store = storeRows[0];

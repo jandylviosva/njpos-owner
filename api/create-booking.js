@@ -67,7 +67,8 @@ async function supa(path, init) {
 const addMinutes = (time, mins) => {
   const [h, m] = time.split(":").map(Number);
   const total = h * 60 + m + mins;
-  const hh = Math.floor((total % 1440) / 60), mm = total % 60;
+  if (total >= 1440) return "24:00"; // clamp, don't wrap — see PWA App.jsx addMinutes comment
+  const hh = Math.floor(total / 60), mm = total % 60;
   return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 };
 const minutesBetween = (start, end) => {
@@ -88,16 +89,64 @@ const isHeld = (b) => {
   return true;
 };
 
-const hasConflict = (bookings, resourceId, date, time, durationMinutes, excludeId) => {
-  if (!resourceId || !time) return false;
+// Mirrors the PWA's findBookingConflict (App.jsx) — keep in sync. Three
+// cases: same-resource overlap; staff blocks (isBlock — store-wide when
+// resourceId is null, whole-day when time is null); and service-level
+// exclusivity for resource-less services (two bookings of the same
+// exclusive service can't overlap even with no resource involved).
+const hasConflict = (bookings, resourceId, date, time, durationMinutes, excludeId, serviceId) => {
+  if (!time) return false;
   const newEnd = addMinutes(time, durationMinutes || 30);
   return bookings.some(b => {
     if (b.id === excludeId) return false;
     if (!isHeld(b)) return false;
-    if (b.resourceId !== resourceId || b.date !== date || !b.time) return false;
+    if (b.date !== date) return false;
+    const scopeMatch = b.isBlock
+      ? (!b.resourceId || (resourceId && b.resourceId === resourceId))
+      : (resourceId
+          ? b.resourceId === resourceId
+          : (serviceId ? (!b.resourceId && b.serviceId === serviceId) : false));
+    if (!scopeMatch) return false;
+    if (b.isBlock && !b.time) return true; // all-day block
+    if (!b.time) return false;
     const bEnd = addMinutes(b.time, b.durationMinutes || 30);
     return time < bEnd && b.time < newEnd;
   });
+};
+
+// ── Working hours (same shape/resolution as the PWA & public page) ──
+const DAYS_OF_WEEK = ["sun","mon","tue","wed","thu","fri","sat"];
+const dayKeyFor = (dateStr) => DAYS_OF_WEEK[new Date(dateStr + "T00:00:00").getDay()];
+const DEFAULT_HOURS = { mon:{start:"09:00",end:"17:00"}, tue:{start:"09:00",end:"17:00"}, wed:{start:"09:00",end:"17:00"}, thu:{start:"09:00",end:"17:00"}, fri:{start:"09:00",end:"17:00"}, sat:null, sun:null };
+const getWorkingHours = (resource, storeDefaultHours, dayKey) => {
+  const hours = (resource && resource.workingHours) || storeDefaultHours || {};
+  return hours[dayKey] || null;
+};
+const toMins = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+
+// "Now" in the store's timezone. Every store is in the Philippines (UTC+8);
+// the serverless runtime is UTC — comparing against server-local time would
+// let customers book slots up to 8 hours in the past.
+const PH_OFFSET_MS = 8 * 3600 * 1000;
+const phNow = () => {
+  const d = new Date(Date.now() + PH_OFFSET_MS);
+  return { dateKey: d.toISOString().slice(0, 10), time: d.toISOString().slice(11, 16) };
+};
+
+// ── Best-effort per-IP rate limit ──
+// In-memory, per serverless instance — resets on cold start and isn't
+// shared across instances, so it's a speed bump for casual abuse, not a
+// hard guarantee. Good enough to stop a naive loop from filling a store's
+// calendar; a shared store (Vercel KV / Upstash) is the upgrade path.
+const rateBuckets = new Map();
+const rateLimited = (ip, max, windowMs) => {
+  const now = Date.now();
+  const arr = (rateBuckets.get(ip) || []).filter(t => now - t < windowMs);
+  if (arr.length >= max) { rateBuckets.set(ip, arr); return true; }
+  arr.push(now);
+  rateBuckets.set(ip, arr);
+  if (rateBuckets.size > 5000) rateBuckets.clear(); // don't let the map grow unbounded
+  return false;
 };
 
 // A service billed hourly only makes sense paired with the flexible
@@ -178,11 +227,23 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { slug, serviceId, resourceId, date, time, endTime, customerFirstName, customerLastName, customerPhone, customerEmail, notes } = req.body || {};
+  const { slug, serviceId, resourceId, date, time, endTime, customerFirstName, customerLastName, customerPhone, customerEmail, notes, website } = req.body || {};
+
+  // Honeypot — a hidden field real customers never see or fill. Anything in
+  // it is a bot; answer with a plausible-looking success so it moves on.
+  if (website) return res.status(200).json({ ok: true, bookingId: "bk0", refCode: "OK", requiresPayment: false, amount: 0, fulfillmentNote: "" });
+
+  const ip = String(req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "?").split(",")[0].trim();
+  if (rateLimited(ip, 5, 10 * 60 * 1000)) {
+    return res.status(429).json({ error: "Too many bookings from this connection — please wait a few minutes and try again." });
+  }
 
   if (!slug) return res.status(400).json({ error: "Missing store" });
   if (!serviceId) return res.status(400).json({ error: "Missing service" });
   if (!date) return res.status(400).json({ error: "Date required" });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return res.status(400).json({ error: "Invalid date" });
+  if (time && !/^\d{2}:\d{2}$/.test(String(time))) return res.status(400).json({ error: "Invalid time" });
+  if (endTime && !/^\d{2}:\d{2}$/.test(String(endTime))) return res.status(400).json({ error: "Invalid time" });
   if (!customerFirstName || !String(customerFirstName).trim()) return res.status(400).json({ error: "First name required" });
   if (!customerLastName || !String(customerLastName).trim()) return res.status(400).json({ error: "Last name required" });
   if (!customerPhone || !String(customerPhone).trim()) return res.status(400).json({ error: "Phone number required" });
@@ -195,7 +256,7 @@ export default async function handler(req, res) {
   const MAX_ATTEMPTS = 4;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const dataRows = await (await supa(
-      `store_data?store_id=eq.${encodeURIComponent(store.id)}&select=enable_bookings,booking_services,booking_resources,bookings,booking_page_settings,business_details,updated_at`
+      `store_data?store_id=eq.${encodeURIComponent(store.id)}&select=enable_bookings,booking_services,booking_resources,bookings,booking_page_settings,business_details,order_settings,updated_at`
     )).json();
     const row = dataRows[0];
     if (!row || !row.enable_bookings) return res.status(404).json({ error: "Bookings are not enabled for this store" });
@@ -203,11 +264,9 @@ export default async function handler(req, res) {
     const svc = (row.booking_services || []).find(s => s.id === serviceId && s.active !== false);
     if (!svc) return res.status(400).json({ error: "This service is no longer available" });
 
+    const pickedResource = resourceId ? (row.booking_resources || []).find(r => r.id === resourceId && r.active !== false) : null;
     if (svc.resourceRequired && !resourceId) return res.status(400).json({ error: "Please select a resource" });
-    if (resourceId) {
-      const res_ = (row.booking_resources || []).find(r => r.id === resourceId && r.active !== false);
-      if (!res_) return res.status(400).json({ error: "This resource is no longer available" });
-    }
+    if (resourceId && !pickedResource) return res.status(400).json({ error: "This resource is no longer available" });
     if (svc.exclusivity && !time) return res.status(400).json({ error: "A time is required for this service" });
     if (svc.durationMode === "flexible" && time && !endTime) return res.status(400).json({ error: "End time required" });
 
@@ -218,8 +277,33 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "End time must be after start time" });
     }
 
-    if (svc.exclusivity && resourceId && time) {
-      if (hasConflict(row.bookings || [], resourceId, date, time, durationMinutes, null)) {
+    // ── DATE / TIME SANITY (server-side — the UI constrains these too, but
+    // anyone POSTing here directly isn't bound by the UI) ──
+    const now = phNow();
+    if (date < now.dateKey) return res.status(400).json({ error: "That date has already passed" });
+    const maxAdvanceDays = Math.min(365, Math.max(1, Number(row.booking_page_settings?.maxAdvanceDays) || 60));
+    const maxDate = new Date(Date.now() + PH_OFFSET_MS + maxAdvanceDays * 86400000).toISOString().slice(0, 10);
+    if (date > maxDate) return res.status(400).json({ error: `Bookings can only be made up to ${maxAdvanceDays} days ahead` });
+    if (time && date === now.dateKey && time <= now.time) return res.status(400).json({ error: "That time has already passed today" });
+
+    // Exclusive (slot-driven) services must also land on a real slot: the
+    // day must be open, the whole booking must fit inside working hours,
+    // and the start must sit on the slot grid the page generates.
+    if (svc.exclusivity && time) {
+      const defaultHours = (row.order_settings && row.order_settings.bookingDefaultHours) || DEFAULT_HOURS;
+      const hours = getWorkingHours(pickedResource, defaultHours, dayKeyFor(date));
+      if (!hours) return res.status(400).json({ error: "The store is closed that day" });
+      const inc = svc.slotIncrementMinutes || 30;
+      if (time < hours.start || addMinutes(time, durationMinutes || inc) > hours.end) {
+        return res.status(400).json({ error: "That time is outside working hours" });
+      }
+      if ((toMins(time) - toMins(hours.start)) % inc !== 0) {
+        return res.status(400).json({ error: "That time isn't an available slot" });
+      }
+    }
+
+    if (svc.exclusivity && time) {
+      if (hasConflict(row.bookings || [], resourceId, date, time, durationMinutes, null, serviceId)) {
         // A real conflict — not a race, an actual taken slot. Don't retry,
         // tell the customer so they can pick another time.
         return res.status(409).json({ error: "That slot was just taken. Please pick another time." });

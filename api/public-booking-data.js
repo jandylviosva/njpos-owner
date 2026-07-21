@@ -72,9 +72,14 @@ export default async function handler(req, res) {
     if (b.status === "pending" && !b.paymentScreenshotPath && b.expiresAt && new Date(b.expiresAt).getTime() < Date.now()) return false;
     return true;
   };
+  // isBlock / serviceId added so the public page can compute availability
+  // under the newer conflict rules: staff blocks (store-wide when
+  // resourceId is null, all-day when time is null) take slots out of the
+  // grid, and exclusive services with no resource conflict against other
+  // bookings of the same service. Still no customer fields — ever.
   const safeBookings = (data.bookings || [])
     .filter(b => isHeld(b) && b.date >= cutoffKey)
-    .map(b => ({ id: b.id, resourceId: b.resourceId || null, date: b.date, time: b.time || null, durationMinutes: b.durationMinutes || null }));
+    .map(b => ({ id: b.id, resourceId: b.resourceId || null, serviceId: b.serviceId || null, isBlock: !!b.isBlock, date: b.date, time: b.time || null, durationMinutes: b.durationMinutes || null }));
 
   return res.status(200).json({
     ok: true,
