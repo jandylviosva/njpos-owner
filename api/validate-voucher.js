@@ -98,6 +98,7 @@ export default async function handler(req, res) {
       type: d.type,
       value: Number(d.value),
       appliesTo: d.applies_to,
+      discountScope: d.discount_scope || "both",
     });
   } catch (e) {
     return res.status(500).json({ ok: false, error: e.message || "Something went wrong" });

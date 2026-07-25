@@ -108,8 +108,8 @@ export default async function handler(req, res) {
   // Voucher — never trust the discount amount the client displayed.
   // Re-run the exact same checks (active, not expired, right plan,
   // email restriction, usage caps) here, and compute the discount
-  // ourselves from the voucher's own type/value against the full
-  // (pre-discount) total.
+  // ourselves from the voucher's own type/value against the correct
+  // scoped subtotal.
   const baseTotal = Number(fullAmount ?? amount) || 0;
   let discountAmount = 0;
   let appliedDiscount = null;
@@ -119,10 +119,29 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: `Voucher error: ${check.error}` });
     }
     appliedDiscount = check.discount;
+    const scope = appliedDiscount.discount_scope || "both";
+
+    // Discount base = the sum of breakdown items the voucher's scope covers.
+    // The breakdown is client-supplied, so guard it: only trust it if its
+    // line items add up to the base total we're actually charging. If it
+    // doesn't reconcile (tampering, or an old client that sent no buckets),
+    // fall back to the whole base total — the discount can only ever get
+    // SMALLER by scoping, never larger, so this fallback is safe.
+    const lineSum = Array.isArray(breakdown)
+      ? breakdown.reduce((s, i) => s + (Number(i.amount) || 0), 0)
+      : 0;
+    const breakdownTrustworthy = Array.isArray(breakdown) && Math.abs(lineSum - baseTotal) < 0.01;
+    let discountBase;
+    if (scope === "both" || !breakdownTrustworthy) {
+      discountBase = baseTotal;
+    } else {
+      discountBase = breakdown.reduce((s, i) => s + (i.bucket === scope ? (Number(i.amount) || 0) : 0), 0);
+    }
+
     discountAmount = appliedDiscount.type === "percentage"
-      ? Math.round(baseTotal * (Number(appliedDiscount.value) / 100) * 100) / 100
+      ? Math.round(discountBase * (Number(appliedDiscount.value) / 100) * 100) / 100
       : Number(appliedDiscount.value);
-    discountAmount = Math.min(Math.max(discountAmount, 0), baseTotal);
+    discountAmount = Math.min(Math.max(discountAmount, 0), discountBase);
   }
   const finalAmount = Math.max(0, baseTotal - discountAmount);
 

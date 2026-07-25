@@ -23,9 +23,13 @@ const GCASH_NUMBER = "0956-013-7170";
 
 function computeBreakdown(plan, addons) {
   const items = [];
+  // bucket: "plan_devices" = the recurring plan + extra device slots;
+  //         "addons" = the one-time feature modules. A voucher's
+  //         discount_scope decides which bucket(s) its discount applies to.
   items.push({
     label: plan === "monthly" ? "Standard Plan (Monthly)" : "Annual Plan (Billed Yearly)",
     amount: PLAN_PRICE[plan],
+    bucket: "plan_devices",
   });
   if (addons.devices > 0) {
     items.push({
@@ -33,13 +37,24 @@ function computeBreakdown(plan, addons) {
         ? `Extra Device Slot × ${addons.devices} (₱${DEVICE_PRICE}/mo each)`
         : `Extra Device Slot × ${addons.devices} (₱${DEVICE_PRICE_ANNUAL}/yr each)`,
       amount: (plan === "monthly" ? DEVICE_PRICE : DEVICE_PRICE_ANNUAL) * addons.devices,
+      bucket: "plan_devices",
     });
   }
   FEATURES.forEach(f => {
-    if (addons[f.key]) items.push({ label: `${f.label} (one-time)`, amount: FEATURE_PRICE });
+    if (addons[f.key]) items.push({ label: `${f.label} (one-time)`, amount: FEATURE_PRICE, bucket: "addons" });
   });
   const total = items.reduce((s, i) => s + i.amount, 0);
   return { items, total };
+}
+
+// Sum only the breakdown items a voucher's scope covers. Shared shape with
+// the server (submit-payment.js) so preview and charge always agree.
+//   scope "plan_devices" -> plan + device lines
+//   scope "addons"       -> the one-time module lines
+//   scope "both"/missing -> everything (legacy default)
+function discountableSubtotal(items, scope) {
+  if (!scope || scope === "both") return items.reduce((s, i) => s + i.amount, 0);
+  return items.reduce((s, i) => s + (i.bucket === scope ? i.amount : 0), 0);
 }
 
 const fmt = (n) => `₱${Number(n).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -102,10 +117,15 @@ export default function PaymentApp() {
   const [voucherChecking, setVoucherChecking] = useState(false);
 
   const { items, total } = computeBreakdown(plan, addons);
+  // Discount base depends on the voucher's scope — the plan+devices subtotal,
+  // the add-ons subtotal, or everything. Both percentage and fixed vouchers
+  // are capped at this scoped subtotal, so a discount can never bleed into a
+  // bucket it doesn't cover (e.g. "add-ons only" never touches the plan).
+  const discountBase = voucher ? discountableSubtotal(items, voucher.scope) : 0;
   const discountAmount = voucher
     ? Math.min(
-        Math.max(voucher.type === "percentage" ? Math.round(total * (voucher.value / 100) * 100) / 100 : voucher.value, 0),
-        total
+        Math.max(voucher.type === "percentage" ? Math.round(discountBase * (voucher.value / 100) * 100) / 100 : voucher.value, 0),
+        discountBase
       )
     : 0;
   const finalTotal = Math.max(0, total - discountAmount);
@@ -123,7 +143,7 @@ export default function PaymentApp() {
       });
       const data = await res.json();
       if (!data.ok) { setVoucherError(data.error || "Invalid voucher"); setVoucher(null); return; }
-      setVoucher({ code: data.code, type: data.type, value: data.value });
+      setVoucher({ code: data.code, type: data.type, value: data.value, scope: data.discountScope || "both" });
     } catch {
       setVoucherError("Could not check voucher — try again");
     } finally {
