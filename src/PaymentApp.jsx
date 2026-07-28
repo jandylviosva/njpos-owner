@@ -166,8 +166,18 @@ export default function PaymentApp() {
     reader.readAsDataURL(f);
   };
 
+  const [copiedMsg, setCopiedMsg] = useState(""); // "name" | "gcash" | ""
+
+  const copyName = () => {
+    navigator.clipboard?.writeText("Jandyl V.");
+    setCopiedMsg("name");
+    setTimeout(() => setCopiedMsg(""), 2000);
+  };
+
   const copyGcash = () => {
-    navigator.clipboard.writeText(GCASH_NUMBER);
+    navigator.clipboard?.writeText(GCASH_NUMBER);
+    setCopiedMsg("gcash");
+    setTimeout(() => setCopiedMsg(""), 2000);
   };
 
   const downloadQr = () => {
@@ -334,21 +344,37 @@ export default function PaymentApp() {
 
               <div style={{ textAlign: "center", marginBottom: 18 }}>
                 <img src={QR_IMAGE_URL} alt="GCash QR" style={{ width: 220, height: 220, borderRadius: 12, border: "1px solid #e5e7eb" }} />
-                <div style={{ marginTop: 10, fontSize: 13, color: "#6b7280" }}>
-                  Account Name: <b style={{ color: "#111" }}>Jandyl V.</b>
-                  <button onClick={() => { navigator.clipboard?.writeText("Jandyl V."); }} title="Copy name" style={{ marginLeft: 6, background: "none", border: "none", cursor: "pointer", color: "#2563EB", verticalAlign: "middle" }}>
-                    <i className="ti ti-copy" />
+                <div style={{ position: "relative", display: "inline-block", marginTop: 10 }}>
+                  <div style={{ fontSize: 13, color: "#6b7280" }}>
+                    Account Name: <b style={{ color: "#111" }}>Jandyl V.</b>
+                    <button onClick={copyName} title="Copy name" style={{ marginLeft: 6, background: "none", border: "none", cursor: "pointer", color: "#2563EB", verticalAlign: "middle" }}>
+                      <i className="ti ti-copy" />
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "#111", marginTop: 4 }}>
+                    GCash: {GCASH_NUMBER}
+                    <button onClick={copyGcash} title="Copy number" style={{ marginLeft: 8, background: "none", border: "none", cursor: "pointer", color: "#2563EB", verticalAlign: "middle" }}>
+                      <i className="ti ti-copy" />
+                    </button>
+                  </div>
+                  {copiedMsg && (
+                    <div style={{
+                      position: "absolute", bottom: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)",
+                      background: "#111827", color: "#fff", fontSize: 11, fontWeight: 700,
+                      padding: "5px 12px", borderRadius: 8, whiteSpace: "nowrap",
+                      pointerEvents: "none", zIndex: 10,
+                      animation: "fadeInOut 2s ease forwards",
+                    }}>
+                      {copiedMsg === "name" ? "Account Name copied" : "GCash Number copied"}
+                    </div>
+                  )}
+                </div>
+                <style>{`@keyframes fadeInOut{0%{opacity:0;transform:translateX(-50%) translateY(4px)}15%{opacity:1;transform:translateX(-50%) translateY(0)}75%{opacity:1}100%{opacity:0}}`}</style>
+                <div style={{ marginTop: 8 }}>
+                  <button onClick={downloadQr} style={{ padding: "6px 14px", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12, fontWeight: 700, color: "#374151", cursor: "pointer" }}>
+                    <i className="ti ti-download" style={{ marginRight: 5 }} />Download QR
                   </button>
                 </div>
-                <div style={{ marginTop: 6, fontSize: 15, fontWeight: 700, color: "#111" }}>
-                  GCash: {GCASH_NUMBER}
-                  <button onClick={copyGcash} title="Copy number" style={{ marginLeft: 8, background: "none", border: "none", cursor: "pointer", color: "#2563EB", verticalAlign: "middle" }}>
-                    <i className="ti ti-copy" />
-                  </button>
-                </div>
-                <button onClick={downloadQr} style={{ marginTop: 8, padding: "6px 14px", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12, fontWeight: 700, color: "#374151", cursor: "pointer" }}>
-                  <i className="ti ti-download" style={{ marginRight: 5 }} />Download QR
-                </button>
               </div>
 
               <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 18, lineHeight: 1.6 }}>
