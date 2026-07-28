@@ -19,7 +19,7 @@ const FEATURES = [
 ];
 
 const QR_IMAGE_URL = "/gcash-qr.jpg";
-const GCASH_NUMBER = "0956-013-7170";
+const GCASH_NUMBER = "09560137170";
 
 function computeBreakdown(plan, addons) {
   const items = [];
@@ -219,10 +219,12 @@ export default function PaymentApp() {
     <div style={{ minHeight: "100vh", boxSizing: "border-box", fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", padding: "40px 16px" }}>
       <div style={{ maxWidth: 640, margin: "0 auto" }}>
         <div style={{ textAlign: "center", marginBottom: 30 }}>
-          <div style={{ width: 56, height: 56, borderRadius: 14, overflow: "hidden", margin: "0 auto 12px" }}>
-            <img src="/icons/icon-192.png" alt="NJ POS" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          </div>
-          <div style={{ fontFamily: "'Michroma',sans-serif", fontSize: 20, letterSpacing: 1 }}><span style={{color:"#2563EB"}}>NJ</span><span style={{color:"#0F172A"}}>POS</span></div>
+          <a href="https://www.nj-systems.com" style={{ textDecoration: "none", display: "inline-block" }}>
+            <div style={{ width: 56, height: 56, borderRadius: 14, overflow: "hidden", margin: "0 auto 12px" }}>
+              <img src="/icons/icon-192.png" alt="NJ POS" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            </div>
+            <div style={{ fontFamily: "'Michroma',sans-serif", fontSize: 20, letterSpacing: 1 }}><span style={{color:"#2563EB"}}>NJ</span><span style={{color:"#0F172A"}}>POS</span></div>
+          </a>
           <div style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 500, fontSize: 10, color: "#6b7280", marginTop: 6, letterSpacing: 0.5 }}>SMART POS. BETTER BUSINESS.</div>
         </div>
 
@@ -332,7 +334,13 @@ export default function PaymentApp() {
 
               <div style={{ textAlign: "center", marginBottom: 18 }}>
                 <img src={QR_IMAGE_URL} alt="GCash QR" style={{ width: 220, height: 220, borderRadius: 12, border: "1px solid #e5e7eb" }} />
-                <div style={{ marginTop: 10, fontSize: 15, fontWeight: 700, color: "#111" }}>
+                <div style={{ marginTop: 10, fontSize: 13, color: "#6b7280" }}>
+                  Account Name: <b style={{ color: "#111" }}>Jandyl V.</b>
+                  <button onClick={() => { navigator.clipboard?.writeText("Jandyl V."); }} title="Copy name" style={{ marginLeft: 6, background: "none", border: "none", cursor: "pointer", color: "#2563EB", verticalAlign: "middle" }}>
+                    <i className="ti ti-copy" />
+                  </button>
+                </div>
+                <div style={{ marginTop: 6, fontSize: 15, fontWeight: 700, color: "#111" }}>
                   GCash: {GCASH_NUMBER}
                   <button onClick={copyGcash} title="Copy number" style={{ marginLeft: 8, background: "none", border: "none", cursor: "pointer", color: "#2563EB", verticalAlign: "middle" }}>
                     <i className="ti ti-copy" />
