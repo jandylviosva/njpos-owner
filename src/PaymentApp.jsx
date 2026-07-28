@@ -343,9 +343,9 @@ export default function PaymentApp() {
               )}
 
               <div style={{ textAlign: "center", marginBottom: 18 }}>
-                <img src={QR_IMAGE_URL} alt="GCash QR" style={{ width: 220, height: 220, borderRadius: 12, border: "1px solid #e5e7eb" }} />
-                <div style={{ position: "relative", display: "inline-block", marginTop: 10 }}>
-                  <div style={{ fontSize: 13, color: "#6b7280" }}>
+                <div style={{ position: "relative", display: "inline-block" }}>
+                  <img src={QR_IMAGE_URL} alt="GCash QR" style={{ width: 220, height: 220, borderRadius: 12, border: "1px solid #e5e7eb", display: "block" }} />
+                  <div style={{ marginTop: 10, fontSize: 13, color: "#6b7280" }}>
                     Account Name: <b style={{ color: "#111" }}>Jandyl V.</b>
                     <button onClick={copyName} title="Copy name" style={{ marginLeft: 6, background: "none", border: "none", cursor: "pointer", color: "#2563EB", verticalAlign: "middle" }}>
                       <i className="ti ti-copy" />
