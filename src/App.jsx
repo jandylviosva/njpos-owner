@@ -607,9 +607,16 @@ function Dashboard({store,data,primary,licenseRow}){
   const [ordersShown,setOrdersShown] = useState(20);
   const [stockShown,setStockShown] = useState(20);
   const [shiftsShown,setShiftsShown] = useState(20);
-  const orders=(data?.orders||[]).filter(o=>o.status==="paid");
+  const [bestsellersShown,setBestsellersShown] = useState(20);
+  const [invShown,setInvShown] = useState(10);
+  const [poShown,setPoShown] = useState(10);
+  const orders=(data?.orders||[]).filter(o=>o.status==="paid"&&!o.invoiceId);
   const products=data?.products||[];
   const shifts=data?.shifts||[];
+  const invoices=data?.invoices||[];
+  const purchaseOrders=data?.purchase_orders||[];
+  const enableInvoice=data?.enable_invoice||false;
+  const enablePO=data?.enable_po||false;
   const activeShifts=Array.isArray(data?.active_shifts) ? data.active_shifts : (data?.active_shift ? [data.active_shift] : []);
   const todayOrders=orders.filter(o=>o.dateKey===todayKey());
   const todaySales=todayOrders.reduce((s,o)=>s+o.total,0);
@@ -618,6 +625,9 @@ function Dashboard({store,data,primary,licenseRow}){
   const lowStock=products.filter(p=>p.active&&computeStockPortal(p,products)>0&&computeStockPortal(p,products)<=5);
   const outOfStock=products.filter(p=>p.active&&computeStockPortal(p,products)<=0);
   const stockAlerts=[...outOfStock.map(p=>({...p,_out:true})), ...lowStock.map(p=>({...p,_out:false}))];
+  const bestsellers=products.filter(p=>p.active&&p.isBestseller);
+  const pendingInvoices=invoices.filter(i=>i.status==="pending"||i.status==="partially_delivered");
+  const pendingPOs=purchaseOrders.filter(po=>po.status==="draft"||po.status==="ordered");
   const CARDS=[
     {label:"Today's Sales",  value:fmt(todaySales), sub:`${todayOrders.length} orders`,    color:primary,    icon:"ti-currency-peso"},
     {label:"This Week",      value:fmt(weekSales),  sub:`${weekOrders.length} orders`,     color:"#0891b2",  icon:"ti-chart-line"},
@@ -738,6 +748,81 @@ function Dashboard({store,data,primary,licenseRow}){
           ))}
           {stockAlerts.length>stockShown&&<div onClick={()=>setStockShown(n=>n+20)} style={{fontSize:12,color:primary,fontWeight:700,marginTop:4,textAlign:"center",cursor:"pointer"}}>Show more ({stockAlerts.length-stockShown} left)</div>}
         </Card>
+
+        {/* Bestsellers */}
+        {bestsellers.length>0&&(
+          <Card>
+            <SectionTitle><span style={{color:"#f59e0b",marginRight:6}}>★</span>Bestsellers ({bestsellers.length})</SectionTitle>
+            {bestsellers.slice(0,bestsellersShown).map(p=>{
+              const stock=computeStockPortal(p,products);
+              const out=stock<=0;
+              const low=!out&&stock<=5;
+              return(
+                <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 10px",background:out?"#fef2f2":low?"#fffbeb":"#f9fafb",borderRadius:8,marginBottom:6}}>
+                  <span style={{fontSize:13,fontWeight:600}}>{p.name}</span>
+                  <span style={{fontSize:11,fontWeight:800,color:out?"#991b1b":low?"#92400e":"#374151",background:out?"#fee2e2":low?"#fef3c7":"#e5e7eb",padding:"2px 8px",borderRadius:10}}>
+                    {out?"OUT":`${stock}${p.stockUnit&&p.stockUnit!=="pcs"?` ${p.stockUnit}`:""}`}
+                  </span>
+                </div>
+              );
+            })}
+            {bestsellers.length>bestsellersShown&&<div onClick={()=>setBestsellersShown(n=>n+20)} style={{fontSize:12,color:primary,fontWeight:700,marginTop:4,textAlign:"center",cursor:"pointer"}}>Show more</div>}
+          </Card>
+        )}
+
+        {/* Pending Invoices */}
+        {enableInvoice&&(
+          <Card>
+            <SectionTitle>Invoices — Pending ({pendingInvoices.length})</SectionTitle>
+            {pendingInvoices.length===0
+              ? <div style={{fontSize:13,color:"#16a34a",textAlign:"center",padding:"12px 0"}}>✅ No pending invoices</div>
+              : pendingInvoices.slice(0,invShown).map(inv=>{
+                  const total=(inv.items||[]).reduce((s,i)=>s+(i.qty||0)*(i.unitPrice||0),0);
+                  const isOverdue=inv.dueDate&&new Date(inv.dueDate)<new Date();
+                  return(
+                    <div key={inv.id} style={{padding:"7px 10px",background:isOverdue?"#fef2f2":"#f9fafb",borderRadius:8,marginBottom:6}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <span style={{fontSize:12,fontWeight:700,fontFamily:"monospace",color:isOverdue?"#dc2626":"#374151"}}>{inv.number}</span>
+                        <span style={{fontSize:12,fontWeight:800,color:primary}}>₱{total.toFixed(2)}</span>
+                      </div>
+                      <div style={{fontSize:11,color:"#9ca3af",marginTop:2}}>
+                        {inv.customerSnapshot?.name||"—"}{inv.dueDate?` · Due ${inv.dueDate}`:""}
+                        {isOverdue&&<span style={{color:"#dc2626",fontWeight:700}}> · Overdue</span>}
+                      </div>
+                    </div>
+                  );
+                })
+            }
+            {pendingInvoices.length>invShown&&<div onClick={()=>setInvShown(n=>n+10)} style={{fontSize:12,color:primary,fontWeight:700,marginTop:4,textAlign:"center",cursor:"pointer"}}>Show more ({pendingInvoices.length-invShown} left)</div>}
+          </Card>
+        )}
+
+        {/* Pending POs */}
+        {enablePO&&(
+          <Card>
+            <SectionTitle>Purchase Orders — Open ({pendingPOs.length})</SectionTitle>
+            {pendingPOs.length===0
+              ? <div style={{fontSize:13,color:"#16a34a",textAlign:"center",padding:"12px 0"}}>✅ No open purchase orders</div>
+              : pendingPOs.slice(0,poShown).map(po=>{
+                  const sub=(po.items||[]).reduce((s,i)=>s+(i.qty||0)*(i.unitCost||0),0);
+                  const total=sub*(po.vatEnabled?1.12:1);
+                  return(
+                    <div key={po.id} style={{padding:"7px 10px",background:"#f9fafb",borderRadius:8,marginBottom:6}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <span style={{fontSize:12,fontWeight:700,fontFamily:"monospace"}}>{po.number}</span>
+                        <span style={{fontSize:12,fontWeight:800,color:"#dc2626"}}>₱{total.toFixed(2)}</span>
+                      </div>
+                      <div style={{fontSize:11,color:"#9ca3af",marginTop:2}}>
+                        {po.supplierName||"—"}{po.deliveryDate?` · Expected ${po.deliveryDate}`:""}
+                      </div>
+                    </div>
+                  );
+                })
+            }
+            {pendingPOs.length>poShown&&<div onClick={()=>setPoShown(n=>n+10)} style={{fontSize:12,color:primary,fontWeight:700,marginTop:4,textAlign:"center",cursor:"pointer"}}>Show more ({pendingPOs.length-poShown} left)</div>}
+          </Card>
+        )}
+
         {/* Recent shifts */}
         {shifts.length>0&&<Card>
           <SectionTitle>Recent Shifts</SectionTitle>
@@ -938,6 +1023,7 @@ function Reports({store,data,primary,isOwner,saveField}){
   const [from,setFrom]=useState("");const [to,setTo]=useState("");
   const [payFilter,setPayFilter]=useState("all");
   const [birMonth,setBirMonth]=useState(new Date().toISOString().slice(0,7));
+  const [expMonth,setExpMonth]=useState(new Date().toISOString().slice(0,7));
   // Shift filter state lifted here so doPrintShifts can use filteredShifts
   const [shiftPeriod,setShiftPeriod]=useState("all");
   const [shiftFrom,setShiftFrom]=useState("");
@@ -1016,7 +1102,7 @@ function Reports({store,data,primary,isOwner,saveField}){
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
         <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-          {[{k:"sales",l:"Sales"},{k:"shifts",l:"Shifts"},{k:"bir",l:"BIR Tax"}].map(t=><button key={t.k} onClick={()=>setTab(t.k)} style={{padding:"5px 14px",borderRadius:6,border:"1px solid",cursor:"pointer",fontSize:12,fontWeight:700,borderColor:tab===t.k?primary:"#e5e7eb",background:tab===t.k?primary:"#fff",color:tab===t.k?"#fff":"#6b7280"}}>{t.l}</button>)}
+          {[{k:"sales",l:"Sales"},{k:"shifts",l:"Shifts"},{k:"expenses",l:"Expenses"},{k:"bir",l:"BIR Tax"}].map(t=><button key={t.k} onClick={()=>setTab(t.k)} style={{padding:"5px 14px",borderRadius:6,border:"1px solid",cursor:"pointer",fontSize:12,fontWeight:700,borderColor:tab===t.k?primary:"#e5e7eb",background:tab===t.k?primary:"#fff",color:tab===t.k?"#fff":"#6b7280"}}>{t.l}</button>)}
         </div>
         <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
           {tab==="sales"&&(<>
@@ -1084,6 +1170,54 @@ function Reports({store,data,primary,isOwner,saveField}){
                 const newShifts=[updated,...allShifts.filter(s=>s.id!==updated.id)];
                 saveField("shifts",newShifts);
               }}/>}
+      {tab==="expenses"&&(()=>{
+        const expenses=data?.store_expenses||[];
+        const filtered=expenses.filter(e=>e.date?.startsWith(expMonth));
+        const total=filtered.reduce((s,e)=>s+(e.amount||0),0);
+        const byCategory={};
+        filtered.forEach(e=>{byCategory[e.category]=(byCategory[e.category]||0)+(e.amount||0);});
+        return(
+          <div>
+            <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:14,flexWrap:"wrap"}}>
+              <input type="month" value={expMonth} onChange={e=>setExpMonth(e.target.value)} style={{...INP,width:"auto",padding:"4px 8px",fontSize:12}}/>
+              <div style={{marginLeft:"auto",fontWeight:800,fontSize:14,color:"#dc2626"}}>Total: {fmt(total)}</div>
+            </div>
+            {filtered.length===0
+              ? <Card><div style={{textAlign:"center",padding:"24px 0",color:"#9ca3af"}}>No expenses recorded for this month.</div></Card>
+              : <>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:14}}>
+                    {Object.entries(byCategory).sort((a,b)=>b[1]-a[1]).map(([cat,amt])=>(
+                      <div key={cat} style={{background:"#fff",borderRadius:10,padding:12,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+                        <div style={{fontSize:10,color:"#9ca3af",marginBottom:3}}>{cat}</div>
+                        <div style={{fontSize:15,fontWeight:800,color:"#dc2626"}}>{fmt(amt)}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <Card style={{padding:0,overflow:"hidden"}}>
+                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                      <thead><tr style={{background:"#f9fafb"}}>
+                        {["Date","Category","Description","Amount"].map(h=>(
+                          <th key={h} style={{padding:"9px 12px",textAlign:h==="Amount"?"right":"left",fontWeight:700,fontSize:11,color:"#6b7280",borderBottom:"1px solid #e5e7eb"}}>{h}</th>
+                        ))}
+                      </tr></thead>
+                      <tbody>
+                        {[...filtered].sort((a,b)=>new Date(b.date)-new Date(a.date)).map((e,i)=>(
+                          <tr key={e.id||i} style={{borderBottom:"0.5px solid #f3f4f6"}}>
+                            <td style={{padding:"9px 12px",color:"#6b7280",fontSize:12}}>{e.date}</td>
+                            <td style={{padding:"9px 12px"}}>{e.category}</td>
+                            <td style={{padding:"9px 12px",color:"#6b7280"}}>{e.description||"—"}</td>
+                            <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,color:"#dc2626"}}>{fmt(e.amount||0)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </Card>
+                </>
+            }
+          </div>
+        );
+      })()}
+
       {tab==="bir"&&(
         <div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:14}}>
@@ -1262,8 +1396,8 @@ function Inventory({store,data,session,primary}){
           <table style={{width:"100%",minWidth:580,borderCollapse:"collapse",fontSize:13}}>
             <thead>
               <tr style={{background:"#f9fafb"}}>
-                {["Product","Category","Retail Price","Cost Price","Stock","SKU","Status"].map(h=>(
-                  <th key={h} style={{padding:"9px 12px",textAlign:"left",fontWeight:700,fontSize:11,color:"#6b7280",borderBottom:"1px solid #e5e7eb"}}>{h}</th>
+                {["Product","★","Category","Retail Price","Cost Price","Stock","SKU","Status"].map(h=>(
+                  <th key={h} style={{padding:"9px 12px",textAlign:h==="★"?"center":"left",fontWeight:700,fontSize:h==="★"?14:11,color:h==="★"?"#f59e0b":"#6b7280",borderBottom:"1px solid #e5e7eb",width:h==="★"?36:undefined}}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -1340,6 +1474,9 @@ function Inventory({store,data,session,primary}){
                             </div>
                           </div>
                         </div>
+                      </td>
+                      <td style={{padding:"8px",textAlign:"center"}}>
+                        <span title={p.isBestseller?"Bestseller":"Not a bestseller"} style={{fontSize:18,color:p.isBestseller?"#f59e0b":"#e5e7eb"}}>★</span>
                       </td>
                       <td style={{padding:"10px 12px",color:"#6b7280"}}>{p.category}</td>
                       <td style={{padding:"10px 12px",fontWeight:700,color:P}}>{priceCell}</td>
@@ -1638,7 +1775,7 @@ function Orders({store,data,session,saveField}){
   const [period,setPeriod]=useState("today");
   const [from,setFrom]=useState("");
   const [to,setTo]=useState("");
-  const orders=data?.orders||[];
+  const orders=(data?.orders||[]).filter(o=>!o.invoiceId); // exclude invoice-generated orders
 
   const inPeriod=o=>{
     if(period==="today")  return o.dateKey===todayKey();
