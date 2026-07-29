@@ -622,7 +622,14 @@ function Dashboard({store,data,primary,licenseRow}){
   const todaySales=todayOrders.reduce((s,o)=>s+o.total,0);
   const weekOrders=orders.filter(o=>o.dateKey>=weekStart());
   const weekSales=weekOrders.reduce((s,o)=>s+o.total,0);
-  const lowStock=products.filter(p=>p.active&&computeStockPortal(p,products)>0&&computeStockPortal(p,products)<=5);
+  const orderSettings=data?.order_settings||{};
+  const globalThreshold=orderSettings.lowStockThreshold??5;
+  const isLowStockPortal=(p,stock)=>{
+    if(stock<=0) return false;
+    const threshold=p.lowStockAt!=null?p.lowStockAt:globalThreshold;
+    return threshold>0&&stock<=threshold;
+  };
+  const lowStock=products.filter(p=>p.active&&isLowStockPortal(p,computeStockPortal(p,products)));
   const outOfStock=products.filter(p=>p.active&&computeStockPortal(p,products)<=0);
   const stockAlerts=[...outOfStock.map(p=>({...p,_out:true})), ...lowStock.map(p=>({...p,_out:false}))];
   const bestsellers=products.filter(p=>p.active&&p.isBestseller);
@@ -756,7 +763,7 @@ function Dashboard({store,data,primary,licenseRow}){
             {bestsellers.slice(0,bestsellersShown).map(p=>{
               const stock=computeStockPortal(p,products);
               const out=stock<=0;
-              const low=!out&&stock<=5;
+              const low=!out&&isLowStockPortal(p,stock);
               return(
                 <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 10px",background:out?"#fef2f2":low?"#fffbeb":"#f9fafb",borderRadius:8,marginBottom:6}}>
                   <span style={{fontSize:13,fontWeight:600}}>{p.name}</span>
