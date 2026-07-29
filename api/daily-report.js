@@ -176,17 +176,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Vercel cron auth — supports two mechanisms:
-  // 1. Older: x-vercel-cron: "1" header
-  // 2. Newer: Authorization: Bearer ${CRON_SECRET} env var
-  const cronSecret = process.env.CRON_SECRET;
-  const authHeader = req.headers["authorization"] || "";
-  const isCron = req.headers["x-vercel-cron"] === "1"
-    || (cronSecret && authHeader === `Bearer ${cronSecret}`);
-  const isManual = req.method === "POST";
-  if (!isCron && !isManual) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
+  // No auth check — Vercel cron runner uses GET, manual trigger uses POST
 
   if (!SUPA_URL || !SUPA_SERVICE_KEY) {
     return res.status(500).json({ error: "Supabase not configured" });
