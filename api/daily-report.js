@@ -83,7 +83,7 @@ async function sendEmail(to, subject, html) {
   return r.ok;
 }
 
-function buildReportHtml(storeName, todayLabel, orders) {
+function buildReportHtml(storeName, todayLabel, orders, products) {
   const paid = orders.filter(o => o.status === "paid");
   const totalSales = paid.reduce((s, o) => s + (o.total || 0), 0);
   const orderCount = paid.length;
@@ -118,6 +118,49 @@ function buildReportHtml(storeName, todayLabel, orders) {
       <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;font-weight:700;text-align:right">${qty}</td>
     </tr>`
   ).join("");
+
+  // Stock alerts — out of stock or at/below lowStockAt threshold
+  const stockAlerts = (products||[])
+    .filter(p => p.active !== false && p.stockMode !== "none")
+    .filter(p => {
+      const stock = Number(p.stock || 0);
+      const threshold = p.lowStockAt != null ? Number(p.lowStockAt) : 5;
+      return stock <= threshold;
+    })
+    .sort((a,b) => Number(a.stock||0) - Number(b.stock||0));
+
+  const stockAlertRows = stockAlerts.map(p => {
+    const stock = Number(p.stock||0);
+    const isOut = stock <= 0;
+    return `<tr>
+      <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;color:#374151">${p.name}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:center;color:#6b7280;font-size:12px">${p.category||'—'}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:700;color:${isOut?'#dc2626':'#d97706'}">${isOut?'Out of stock':`${stock} ${p.stockUnit||'pcs'} left`}</td>
+    </tr>`;
+  }).join('');
+
+  // Starred / bestseller products with current stock
+  const starredProducts = (products||[])
+    .filter(p => p.isBestseller && p.active !== false)
+    .sort((a,b) => (b.stock||0) - (a.stock||0));
+
+  // Build a qty-sold-today map from today's orders
+  const soldTodayMap = {};
+  paid.forEach(o => (o.items||[]).forEach(it => {
+    soldTodayMap[it.name] = (soldTodayMap[it.name]||0) + (it.qty||1);
+  }));
+
+  const starredRows = starredProducts.map(p => {
+    const stock = Number(p.stock||0);
+    const isOut = stock <= 0;
+    const soldToday = soldTodayMap[p.name] || 0;
+    return `<tr>
+      <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;color:#374151">⭐ ${p.name}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:center;color:#6b7280;font-size:12px">${p.category||'—'}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:700;color:${isOut?'#dc2626':stock<=5?'#d97706':'#059669'}">${isOut?'Out of stock':`${stock} ${p.stockUnit||'pcs'}`}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:700;color:${soldToday>0?'#2563EB':'#9ca3af'}">${soldToday > 0 ? soldToday+' sold' : '—'}</td>
+    </tr>`;
+  }).join('');
 
   return `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px">
@@ -162,6 +205,38 @@ function buildReportHtml(storeName, todayLabel, orders) {
         <tbody>${productRows}</tbody>
       </table>` : ""}
 
+      ${stockAlertRows ? `
+      <h3 style="font-size:13px;color:#dc2626;margin:0 0 8px">⚠️ Stock Alerts</h3>
+      <p style="font-size:11px;color:#9ca3af;margin:0 0 8px">Products at or below low stock threshold</p>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #fecaca">
+        <thead>
+          <tr style="background:#fef2f2">
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:700">Product</th>
+            <th style="padding:8px 12px;text-align:center;font-size:11px;color:#6b7280;font-weight:700">Category</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:700">Stock</th>
+          </tr>
+        </thead>
+        <tbody>${stockAlertRows}</tbody>
+      </table>` : `
+      <div style="background:#f0fdf4;border-radius:8px;padding:12px;margin-bottom:20px;text-align:center;color:#059669;font-size:13px;font-weight:700">
+        ✅ All products are well-stocked
+      </div>`}
+
+      ${starredRows ? `
+      <h3 style="font-size:13px;color:#374151;margin:0 0 8px">⭐ Starred Products</h3>
+      <p style="font-size:11px;color:#9ca3af;margin:0 0 8px">Your marked bestseller products and their current stock</p>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #f3f4f6">
+        <thead>
+          <tr style="background:#fffbeb">
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:700">Product</th>
+            <th style="padding:8px 12px;text-align:center;font-size:11px;color:#6b7280;font-weight:700">Category</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:700">Stock</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:700">Sold Today</th>
+          </tr>
+        </thead>
+        <tbody>${starredRows}</tbody>
+      </table>` : ""}
+
       <p style="color:#9ca3af;font-size:11px;margin-top:24px;border-top:1px solid #f3f4f6;padding-top:16px">
         Sent automatically by NJ POS · ${new Date().toLocaleString("en-PH", { timeZone: "Asia/Manila" })}
         <br>To change your report schedule: POS app → Settings → Order Settings → Scheduled Daily Report
@@ -201,7 +276,7 @@ export default async function handler(req, res) {
   // Fetch all store_data rows that have order_settings + orders.
   // We select only what we need to keep the payload small.
   const rows = await supaGet(
-    "store_data?select=store_id,order_settings,orders,theme"
+    "store_data?select=store_id,order_settings,orders,products,theme"
   );
   if (!rows) {
     return res.status(500).json({ error: "Failed to fetch store_data" });
@@ -225,7 +300,8 @@ export default async function handler(req, res) {
     // Filter to yesterday's orders (the day the report covers)
     const todayOrders = allOrders.filter(o => o.dateKey === reportKey);
 
-    const html = buildReportHtml(storeName, todayLabel, todayOrders);
+    const allProducts = row.products || [];
+    const html = buildReportHtml(storeName, todayLabel, todayOrders, allProducts);
     const subject = `Daily Sales Report — ${todayLabel} · ${storeName}`;
 
     try {
