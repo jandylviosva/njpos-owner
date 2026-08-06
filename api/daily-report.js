@@ -83,11 +83,23 @@ async function sendEmail(to, subject, html) {
   return r.ok;
 }
 
-function buildReportHtml(storeName, todayLabel, orders, products) {
+function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses, reportKey) {
   const paid = orders.filter(o => o.status === "paid");
   const totalSales = paid.reduce((s, o) => s + (o.total || 0), 0);
   const orderCount = paid.length;
-  const avgOrder   = orderCount > 0 ? totalSales / orderCount : 0;
+
+  // Shift expenses — cash expenses recorded during shifts for this day
+  const shiftExpenses = paid.reduce((s, o) => {
+    return s + ((o.expenses||[]).reduce((es, e) => es + (parseFloat(e.amount)||0), 0));
+  }, 0);
+
+  // Store-level expenses (bills, rent, utilities) for this day
+  const storeLevelExpenses = (storeExpenses||[])
+    .filter(e => e.date === reportKey)
+    .reduce((s, e) => s + (parseFloat(e.amount)||0), 0);
+
+  const totalExpenses = shiftExpenses + storeLevelExpenses;
+  const netSales = totalSales - totalExpenses;
 
   // Payment method breakdown
   const byMethod = {};
@@ -172,7 +184,7 @@ function buildReportHtml(storeName, todayLabel, orders, products) {
       <h2 style="font-size:16px;color:#111;margin:0 0 4px">Daily Sales Report</h2>
       <p style="color:#9ca3af;font-size:12px;margin:0 0 20px">${todayLabel}</p>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:24px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px">
         <div style="background:#f0fdf4;border-radius:10px;padding:14px;text-align:center">
           <div style="font-size:10px;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Total Sales</div>
           <div style="font-size:22px;font-weight:800;color:#059669">${fmtPeso(totalSales)}</div>
@@ -181,9 +193,13 @@ function buildReportHtml(storeName, todayLabel, orders, products) {
           <div style="font-size:10px;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Orders</div>
           <div style="font-size:22px;font-weight:800;color:#2563EB">${orderCount}</div>
         </div>
-        <div style="background:#faf5ff;border-radius:10px;padding:14px;text-align:center">
-          <div style="font-size:10px;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Avg Order</div>
-          <div style="font-size:22px;font-weight:800;color:#7c3aed">${orderCount > 0 ? fmtPeso(avgOrder) : "—"}</div>
+        <div style="background:#fef2f2;border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:10px;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Expenses</div>
+          <div style="font-size:22px;font-weight:800;color:#dc2626">${totalExpenses > 0 ? fmtPeso(totalExpenses) : "—"}</div>
+        </div>
+        <div style="background:${netSales >= 0 ? "#f0fdf4" : "#fef2f2"};border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:10px;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Net Sales</div>
+          <div style="font-size:22px;font-weight:800;color:${netSales >= 0 ? "#059669" : "#dc2626"}">${fmtPeso(netSales)}</div>
         </div>
       </div>
 
@@ -192,6 +208,22 @@ function buildReportHtml(storeName, todayLabel, orders, products) {
       <table style="width:100%;border-collapse:collapse;margin-bottom:20px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #f3f4f6">
         ${methodRows}
       </table>` : ""}
+
+      ${(totalExpenses > 0) ? `
+      <h3 style="font-size:13px;color:#374151;margin:0 0 8px">Expenses</h3>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #fecaca">
+        ${shiftExpenses > 0 ? `<tr style="background:#fffbeb"><td colspan="2" style="padding:6px 12px;font-size:11px;font-weight:700;color:#d97706">Shift Expenses</td></tr>
+        ${paid.reduce((rows, o) => {
+          (o.expenses||[]).forEach(e => { rows += `<tr><td style="padding:6px 12px 6px 20px;border-bottom:1px solid #f9fafb;color:#6b7280;font-size:12px">${e.name||e.description||"Expense"}</td><td style="padding:6px 12px;border-bottom:1px solid #f9fafb;text-align:right;font-weight:700;color:#991b1b;font-size:12px">${fmtPeso(parseFloat(e.amount)||0)}</td></tr>`; });
+          return rows;
+        }, "")}` : ""}
+        ${storeLevelExpenses > 0 ? `<tr style="background:#faf5ff"><td colspan="2" style="padding:6px 12px;font-size:11px;font-weight:700;color:#7c3aed">Store Expenses</td></tr>
+        ${(storeExpenses||[]).filter(e=>e.date===reportKey).sort((a,b)=>b.date.localeCompare(a.date)).map(e=>`<tr><td style="padding:6px 12px 6px 20px;border-bottom:1px solid #f9fafb;color:#6b7280;font-size:12px">${e.description} <span style="color:#9ca3af">(${e.category||""})</span></td><td style="padding:6px 12px;border-bottom:1px solid #f9fafb;text-align:right;font-weight:700;color:#991b1b;font-size:12px">${fmtPeso(parseFloat(e.amount)||0)}</td></tr>`).join("")}` : ""}
+        <tr style="background:#fef2f2"><td style="padding:8px 12px;font-weight:800;font-size:13px">Total Expenses</td><td style="padding:8px 12px;text-align:right;font-weight:800;color:#dc2626;font-size:13px">${fmtPeso(totalExpenses)}</td></tr>
+      </table>` : `
+      <div style="background:#f0fdf4;border-radius:8px;padding:12px;margin-bottom:20px;text-align:center;color:#059669;font-size:13px;font-weight:700">
+        ✅ No expenses recorded today
+      </div>`}
 
       ${productRows ? `
       <h3 style="font-size:13px;color:#374151;margin:0 0 8px">Top Products</h3>
@@ -301,7 +333,8 @@ export default async function handler(req, res) {
     const todayOrders = allOrders.filter(o => o.dateKey === reportKey);
 
     const allProducts = row.products || [];
-    const html = buildReportHtml(storeName, todayLabel, todayOrders, allProducts);
+    const allStoreExpenses = row.store_expenses || os.storeExpenses || [];
+    const html = buildReportHtml(storeName, todayLabel, todayOrders, allProducts, allStoreExpenses, reportKey);
     const subject = `Daily Sales Report — ${todayLabel} · ${storeName}`;
 
     try {
