@@ -99,7 +99,6 @@ function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses,
     .reduce((s, e) => s + (parseFloat(e.amount)||0), 0);
 
   const totalExpenses = shiftExpenses + storeLevelExpenses;
-  const netSales = totalSales - totalExpenses;
 
   // Payment method breakdown
   const byMethod = {};
@@ -107,14 +106,27 @@ function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses,
     const m = o.payMethod || "cash";
     byMethod[m] = (byMethod[m] || 0) + (o.total || 0);
   });
+
+  // Cash on Hand = cash collected minus expenses (expenses paid from cash drawer)
+  const cashCollected = byMethod["cash"] || 0;
+  const cashOnHand = cashCollected - totalExpenses;
+  // Non-cash total
+  const nonCashTotal = Object.entries(byMethod).filter(([k]) => k !== "cash").reduce((s,[,v]) => s + v, 0);
+  // Net Sales = Cash on Hand + all non-cash payments
+  const netSales = cashOnHand + nonCashTotal;
+
+  // Payment method rows — cash shows CoH, others show collected amount
   const methodRows = Object.entries(byMethod)
     .sort((a, b) => b[1] - a[1])
-    .map(([m, amt]) =>
-      `<tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;color:#6b7280;text-transform:capitalize">${m}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;font-weight:700;text-align:right">${fmtPeso(amt)}</td>
-      </tr>`
-    ).join("");
+    .map(([m, amt]) => {
+      const isCash = m === "cash";
+      const displayAmt = isCash ? cashOnHand : amt;
+      const sub = isCash && totalExpenses > 0 ? `<div style="font-size:10px;color:#9ca3af;margin-top:2px">collected ${fmtPeso(amt)} − expenses ${fmtPeso(totalExpenses)}</div>` : "";
+      return `<tr>
+        <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;color:#6b7280;text-transform:capitalize">${isCash ? "Cash (on hand)" : m}${sub}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;font-weight:700;text-align:right;color:${isCash && cashOnHand < 0 ? "#dc2626" : "inherit"}">${fmtPeso(displayAmt)}</td>
+      </tr>`;
+    }).join("");
 
   // Top 5 products by qty
   const productQty = {};
@@ -197,9 +209,15 @@ function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses,
           <div style="font-size:10px;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Expenses</div>
           <div style="font-size:22px;font-weight:800;color:#dc2626">${totalExpenses > 0 ? fmtPeso(totalExpenses) : "—"}</div>
         </div>
-        <div style="background:${netSales >= 0 ? "#f0fdf4" : "#fef2f2"};border-radius:10px;padding:14px;text-align:center">
+        <div style="background:${cashOnHand >= 0 ? "#f0fdf4" : "#fef2f2"};border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:10px;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Cash on Hand</div>
+          <div style="font-size:22px;font-weight:800;color:${cashOnHand >= 0 ? "#059669" : "#dc2626"}">${fmtPeso(cashOnHand)}</div>
+          <div style="font-size:10px;color:#6b7280;margin-top:4px">cash − expenses</div>
+        </div>
+        <div style="background:${netSales >= 0 ? "#f0fdf4" : "#fef2f2"};border-radius:10px;padding:14px;text-align:center;grid-column:1/-1">
           <div style="font-size:10px;color:#6b7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Net Sales</div>
           <div style="font-size:22px;font-weight:800;color:${netSales >= 0 ? "#059669" : "#dc2626"}">${fmtPeso(netSales)}</div>
+          <div style="font-size:10px;color:#6b7280;margin-top:4px">Cash on Hand + other payments</div>
         </div>
       </div>
 
