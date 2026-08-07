@@ -1062,7 +1062,40 @@ function Reports({store,data,primary,isOwner,saveField}){
   const totalSales=orders.reduce((s,o)=>s+o.total,0);
   const avg=orders.length?totalSales/orders.length:0;
   const payBreakdown={cash:0,gcash:0,maya:0,card:0};
-  allOrders.filter(inPeriod).forEach(o=>{if(payBreakdown[o.payMethod]!==undefined)payBreakdown[o.payMethod]+=o.total;});
+  allOrders.filter(inPeriod).forEach(o=>{
+    const m=o.payMethod||"cash";
+    payBreakdown[m]=(payBreakdown[m]||0)+o.total;
+  });
+  // Expenses
+  const storeExpenses = data?.store_expenses||[];
+  const storeExpInPeriod = storeExpenses.filter(e=>{
+    if(!e.date) return false;
+    if(period==="today")  return e.date===todayKey();
+    if(period==="week")   return e.date>=weekStart();
+    if(period==="month")  return e.date>=monthStart();
+    if(period==="all")    return true;
+    if(period==="custom") return(!from||e.date>=from)&&(!to||e.date<=to);
+    return true;
+  });
+  const storeExpTotal = storeExpInPeriod.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+  const shiftExpTotal = orders.reduce((s,o)=>s+((o.expenses||[]).reduce((es,e)=>es+(parseFloat(e.amount)||0),0)),0);
+  const totalExpenses = shiftExpTotal + storeExpTotal;
+  // Cash on Hand = cash collected − expenses
+  const cashCollected = payBreakdown.cash||0;
+  const cashOnHand = cashCollected - totalExpenses;
+  const nonCashTotal = Object.entries(payBreakdown).filter(([k])=>k!=="cash").reduce((s,[,v])=>s+v,0);
+  const netSales = cashOnHand + nonCashTotal;
+  // Gross profit (only for products with cost price set)
+  const {grossProfit,revWithCost} = orders.reduce((acc,o)=>{
+    (o.items||[]).forEach(i=>{
+      const p=(data?.products||[]).find(pr=>pr.id===(i.productId||i.id));
+      const cost=p?.hasVariants?(p.variants?.find(v=>v.id===i.variantId)?.costPrice||0):(p?.costPrice||0);
+      if(cost>0){acc.revWithCost+=(i.price||0)*(i.qty||1);acc.grossProfit+=(i.price||0)*(i.qty||1)-cost*(i.qty||1);}
+    });
+    return acc;
+  },{grossProfit:0,revWithCost:0});
+  const grossMarginPct = revWithCost>0?(grossProfit/revWithCost*100):null;
+
   const prodSales={};orders.forEach(o=>o.items?.forEach(i=>{prodSales[i.name]=(prodSales[i.name]||{qty:0,rev:0});prodSales[i.name].qty+=i.qty;prodSales[i.name].rev+=i.price*i.qty;}));
   const topProds=Object.entries(prodSales).sort((a,b)=>b[1].rev-a[1].rev).slice(0,10);
   const cashierS={};orders.forEach(o=>{cashierS[o.cashier]=(cashierS[o.cashier]||{n:0,rev:0});cashierS[o.cashier].n++;cashierS[o.cashier].rev+=o.total;});
@@ -1090,8 +1123,39 @@ function Reports({store,data,primary,isOwner,saveField}){
     const pRows=topProds.map(([n,d],i)=>`<tr><td>#${i+1} ${n}</td><td class="right">${d.qty}</td><td class="right bold">${fmt(d.rev)}</td></tr>`).join("");
     const cRows=Object.entries(cashierS).map(([n,d])=>`<tr><td>${n}</td><td class="right">${d.n}</td><td class="right bold">${fmt(d.rev)}</td></tr>`).join("");
     const oRows=orders.slice(0,100).map(o=>`<tr><td style="font-family:monospace;font-size:11px">${o.id}</td><td>${o.date}</td><td>${o.cashier}</td><td>${o.payMethod?.toUpperCase()}</td><td class="right bold">${fmt(o.total)}</td></tr>`).join("");
-    const payRows=Object.entries(payBreakdown).filter(([,v])=>v>0).map(([k,v])=>`<tr><td>${k.toUpperCase()}</td><td class="right bold">${fmt(v)}</td></tr>`).join("");
-    printReport(`<h1>Sales Report — ${periodLabel}${payFilter!=="all"?` · ${payFilter.toUpperCase()}`:""}</h1><p class="meta">Store: ${store?.store_name} | ${new Date().toLocaleString("en-PH")} | ${orders.length} orders</p><div class="summary"><div class="card"><div class="card-label">Total Sales</div><div class="card-val">${fmt(totalSales)}</div></div><div class="card"><div class="card-label">Orders</div><div class="card-val">${orders.length}</div></div><div class="card"><div class="card-label">Avg Order</div><div class="card-val">${fmt(avg)}</div></div></div>${payRows?`<h2>By Payment Method</h2><table><thead><tr><th>Method</th><th class="right">Total</th></tr></thead><tbody>${payRows}</tbody></table>`:""}${topProds.length?`<h2>Top Products</h2><table><thead><tr><th>Product</th><th class="right">Qty</th><th class="right">Revenue</th></tr></thead><tbody>${pRows}</tbody></table>`:""}${Object.keys(cashierS).length?`<h2>By Cashier</h2><table><thead><tr><th>Cashier</th><th class="right">Orders</th><th class="right">Revenue</th></tr></thead><tbody>${cRows}</tbody></table>`:""}${orders.length?`<h2>Orders</h2><table><thead><tr><th>Order ID</th><th>Date</th><th>Cashier</th><th>Payment</th><th class="right">Total</th></tr></thead><tbody>${oRows}</tbody></table>`:""}`,`Sales Report — ${store?.store_name}`);
+    const knownMethods=["cash","gcash","maya","card"];
+    const payMethodRows=Object.entries(payBreakdown).filter(([,v])=>v>0).map(([k,v])=>{
+      const isCash=k==="cash";
+      const displayAmt=isCash?cashOnHand:v;
+      const label=isCash?"Cash (on hand)":(k.charAt(0).toUpperCase()+k.slice(1));
+      const sub=isCash&&totalExpenses>0?` <span style="font-size:10px;color:#9ca3af">(collected ${fmt(v)} − expenses ${fmt(totalExpenses)})</span>`:"";
+      return `<tr><td>${label}${sub}</td><td class="right bold" style="color:${isCash&&cashOnHand<0?"#dc2626":"inherit"}">${fmt(displayAmt)}</td></tr>`;
+    }).join("");
+    // Expenses section
+    const shiftExpRows=orders.reduce((rows,o)=>{(o.expenses||[]).forEach(e=>{rows+=`<tr><td style="padding-left:16px;color:#6b7280">${e.name||e.description||"Expense"}</td><td class="right" style="color:#991b1b">${fmt(parseFloat(e.amount)||0)}</td></tr>`;});return rows;},"");
+    const storeExpRows=storeExpInPeriod.sort((a,b)=>b.date.localeCompare(a.date)).map(e=>`<tr><td style="padding-left:16px;color:#6b7280">${e.description} <span style="color:#9ca3af">(${e.category})</span></td><td class="right" style="color:#991b1b">${fmt(parseFloat(e.amount)||0)}</td></tr>`).join("");
+    const expSection=totalExpenses>0?`<h2>Expenses</h2><table><thead><tr><th>Description</th><th class="right">Amount</th></tr></thead><tbody>${shiftExpTotal>0?`<tr><td style="font-weight:700;color:#d97706">Shift Expenses</td><td class="right bold" style="color:#d97706">${fmt(shiftExpTotal)}</td></tr>${shiftExpRows}`:""} ${storeExpInPeriod.length>0?`<tr><td style="font-weight:700;color:#7c3aed">Store Expenses</td><td class="right bold" style="color:#7c3aed">${fmt(storeExpTotal)}</td></tr>${storeExpRows}`:""}<tr style="font-weight:800;background:#fef2f2"><td>Total Expenses</td><td class="right" style="color:#991b1b">${fmt(totalExpenses)}</td></tr></tbody></table>`:`<p style="color:#059669;font-weight:700">✅ No expenses recorded for this period.</p>`;
+    // Split orders and invoices
+    const regularOrders=orders.filter(o=>o.orderType!=="Invoice");
+    const invoiceOrders=orders.filter(o=>o.orderType==="Invoice");
+    const rRows=regularOrders.slice(0,50).map(o=>`<tr><td style="font-family:monospace;font-size:11px">${o.id}</td><td>${o.date}</td><td>${o.cashier}</td><td>${o.payMethod?.toUpperCase()}</td><td class="right bold">${fmt(o.total)}</td></tr>`).join("");
+    const iRows=invoiceOrders.slice(0,50).map(o=>`<tr><td style="font-family:monospace;font-size:11px">${o.id}</td><td>${o.date}</td><td>${o.orderSource||o.cashier}</td><td>${o.cashier}</td><td>${o.payMethod?.toUpperCase()}</td><td class="right bold">${fmt(o.total)}</td></tr>`).join("");
+    printReport(`<h1>Sales Report — ${periodLabel}${payFilter!=="all"?` · ${payFilter.toUpperCase()}`:""}</h1><p class="meta">Store: ${store?.store_name} | ${new Date().toLocaleString("en-PH")} | ${orders.length} orders</p>
+    <div class="summary">
+      <div class="card"><div class="card-label">Total Sales</div><div class="card-val">${fmt(totalSales)}</div></div>
+      <div class="card"><div class="card-label">Orders</div><div class="card-val">${orders.length}</div></div>
+      ${grossMarginPct!==null?`<div class="card"><div class="card-label">Gross Profit</div><div class="card-val" style="color:${grossProfit>=0?"#16a34a":"#dc2626"}">${fmt(grossProfit)}</div><div style="font-size:10px;color:#6b7280">${grossMarginPct.toFixed(1)}% margin</div></div>`:""}
+      <div class="card"><div class="card-label">Expenses</div><div class="card-val" style="color:#991b1b">${fmt(totalExpenses)}</div></div>
+      <div class="card"><div class="card-label">Cash on Hand</div><div class="card-val" style="color:${cashOnHand>=0?"#059669":"#dc2626"}">${fmt(cashOnHand)}</div><div style="font-size:10px;color:#6b7280">cash − expenses</div></div>
+      <div class="card"><div class="card-label">Net Sales</div><div class="card-val" style="color:${netSales>=0?"#16a34a":"#dc2626"}">${fmt(netSales)}</div><div style="font-size:10px;color:#6b7280">CoH + other payments</div></div>
+    </div>
+    ${payMethodRows?`<h2>Payment Methods</h2><table><thead><tr><th>Method</th><th class="right">Amount</th></tr></thead><tbody>${payMethodRows}<tr style="font-weight:800;border-top:2px solid #e5e7eb"><td>Net Sales</td><td class="right" style="color:${netSales>=0?"#16a34a":"#dc2626"}">${fmt(netSales)}</td></tr></tbody></table>`:""}
+    ${expSection}
+    ${topProds.length?`<h2>Top Products</h2><table><thead><tr><th>Product</th><th class="right">Qty</th><th class="right">Revenue</th></tr></thead><tbody>${pRows}</tbody></table>`:""}
+    ${Object.keys(cashierS).length?`<h2>By Cashier</h2><table><thead><tr><th>Cashier</th><th class="right">Orders</th><th class="right">Revenue</th></tr></thead><tbody>${cRows}</tbody></table>`:""}
+    ${regularOrders.length?`<h2>Orders${regularOrders.length>50?" (first 50)":""}</h2><table><thead><tr><th>Order ID</th><th>Date</th><th>Cashier</th><th>Payment</th><th class="right">Total</th></tr></thead><tbody>${rRows}<tr style="font-weight:800;background:#f9fafb"><td colspan="4">Subtotal (${regularOrders.length} orders)</td><td class="right" style="color:#2563EB">${fmt(regularOrders.reduce((s,o)=>s+o.total,0))}</td></tr></tbody></table>`:""}
+    ${invoiceOrders.length?`<h2>Invoices${invoiceOrders.length>50?" (first 50)":""}</h2><table><thead><tr><th>Invoice ID</th><th>Date</th><th>Customer</th><th>Cashier</th><th>Payment</th><th class="right">Total</th></tr></thead><tbody>${iRows}<tr style="font-weight:800;background:#f5f3ff"><td colspan="5">Subtotal (${invoiceOrders.length} invoices)</td><td class="right" style="color:#7c3aed">${fmt(invoiceOrders.reduce((s,o)=>s+o.total,0))}</td></tr></tbody></table>`:""}
+    `,`Sales Report — ${store?.store_name}`);
   };
   const doPrintShifts=()=>{
     const rows=filteredShifts.map(s=>{
@@ -1138,10 +1202,13 @@ function Reports({store,data,primary,isOwner,saveField}){
         </Card>
       )}
       {tab==="sales"&&<>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:18}}>
-          {[{l:"Total Sales",v:fmt(totalSales),c:primary},{l:"Orders",v:orders.length,c:"#0891b2"},{l:"Avg Order",v:fmt(avg),c:"#059669"}].map(m=>(
-            <Card key={m.l} style={{marginBottom:0}}><div style={{fontSize:11,color:"#9ca3af",marginBottom:5}}>{m.l}</div><div style={{fontSize:22,fontWeight:800,color:m.c}}>{m.v}</div></Card>
-          ))}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:18}}>
+          <Card style={{marginBottom:0}}><div style={{fontSize:11,color:"#9ca3af",marginBottom:4}}>Total Sales</div><div style={{fontSize:20,fontWeight:800,color:primary}}>{fmt(totalSales)}</div></Card>
+          <Card style={{marginBottom:0}}><div style={{fontSize:11,color:"#9ca3af",marginBottom:4}}>Orders</div><div style={{fontSize:20,fontWeight:800,color:"#0891b2"}}>{orders.length}</div>{orders.filter(o=>o.orderType==="Invoice").length>0&&<div style={{fontSize:10,color:"#9ca3af",marginTop:2}}>{orders.filter(o=>o.orderType!=="Invoice").length} orders · {orders.filter(o=>o.orderType==="Invoice").length} invoices</div>}</Card>
+          {grossMarginPct!==null&&<Card style={{marginBottom:0}}><div style={{fontSize:11,color:"#9ca3af",marginBottom:4}}>Gross Profit</div><div style={{fontSize:20,fontWeight:800,color:grossProfit>=0?"#16a34a":"#dc2626"}}>{fmt(grossProfit)}</div><div style={{fontSize:10,color:"#9ca3af",marginTop:2}}>{grossMarginPct.toFixed(1)}% margin</div></Card>}
+          <Card style={{marginBottom:0}}><div style={{fontSize:11,color:"#9ca3af",marginBottom:4}}>Expenses</div><div style={{fontSize:20,fontWeight:800,color:totalExpenses>0?"#991b1b":"#9ca3af"}}>{totalExpenses>0?fmt(totalExpenses):"₱0.00"}</div>{(shiftExpTotal>0||storeExpInPeriod.length>0)&&<div style={{fontSize:10,color:"#9ca3af",marginTop:2}}>{shiftExpTotal>0&&`shift: ${fmt(shiftExpTotal)}`}{shiftExpTotal>0&&storeExpInPeriod.length>0?" · ":""}{storeExpInPeriod.length>0&&`store: ${fmt(storeExpTotal)}`}</div>}</Card>
+          <Card style={{marginBottom:0}}><div style={{fontSize:11,color:"#9ca3af",marginBottom:4}}>Cash on Hand</div><div style={{fontSize:20,fontWeight:800,color:cashOnHand>=0?"#059669":"#dc2626"}}>{fmt(cashOnHand)}</div><div style={{fontSize:10,color:"#9ca3af",marginTop:2}}>cash − expenses</div></Card>
+          <Card style={{marginBottom:0}}><div style={{fontSize:11,color:"#9ca3af",marginBottom:4}}>Net Sales</div><div style={{fontSize:20,fontWeight:800,color:netSales>=0?"#16a34a":"#dc2626"}}>{fmt(netSales)}</div><div style={{fontSize:10,color:"#9ca3af",marginTop:2}}>CoH + other payments</div></Card>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
           <Card><SectionTitle>Top Products</SectionTitle>
