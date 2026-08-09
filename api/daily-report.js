@@ -31,6 +31,15 @@ function fmtPeso(n) {
   });
 }
 
+function labelForMethod(methodId, payMethods) {
+  if (!methodId) return "";
+  const built = { cash: "Cash", gcash: "GCash", maya: "Maya", card: "Card" };
+  if (built[methodId]) return built[methodId];
+  const custom = (payMethods || []).find(m => m.id === methodId);
+  if (custom?.label) return custom.label;
+  return methodId.charAt(0).toUpperCase() + methodId.slice(1);
+}
+
 async function supaGet(path) {
   const r = await fetch(`${SUPA_URL}/rest/v1/${path}`, {
     headers: {
@@ -83,7 +92,7 @@ async function sendEmail(to, subject, html) {
   return r.ok;
 }
 
-function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses, reportKey) {
+function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses, reportKey, payMethods) {
   const paid = orders.filter(o => o.status === "paid");
   const totalSales = paid.reduce((s, o) => s + (o.total || 0), 0);
   const orderCount = paid.length;
@@ -122,8 +131,9 @@ function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses,
       const isCash = m === "cash";
       const displayAmt = isCash ? cashOnHand : amt;
       const sub = isCash && totalExpenses > 0 ? `<div style="font-size:10px;color:#9ca3af;margin-top:2px">collected ${fmtPeso(amt)} − expenses ${fmtPeso(totalExpenses)}</div>` : "";
+      const label = isCash ? "Cash (on hand)" : labelForMethod(m, payMethods);
       return `<tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;color:#6b7280;text-transform:capitalize">${isCash ? "Cash (on hand)" : m}${sub}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;color:#6b7280">${label}${sub}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;font-weight:700;text-align:right;color:${isCash && cashOnHand < 0 ? "#dc2626" : "inherit"}">${fmtPeso(displayAmt)}</td>
       </tr>`;
     }).join("");
@@ -352,7 +362,8 @@ export default async function handler(req, res) {
 
     const allProducts = row.products || [];
     const allStoreExpenses = row.store_expenses || os.storeExpenses || [];
-    const html = buildReportHtml(storeName, todayLabel, todayOrders, allProducts, allStoreExpenses, reportKey);
+    const payMethods = os.payMethods || [];
+    const html = buildReportHtml(storeName, todayLabel, todayOrders, allProducts, allStoreExpenses, reportKey, payMethods);
     const subject = `Daily Sales Report — ${todayLabel} · ${storeName}`;
 
     try {
