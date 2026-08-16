@@ -27,7 +27,7 @@ function setCorsHeaders(req, res) {
   // Allow any vercel.app subdomain for your projects, or exact matches
   const allowed =
     ALLOWED_ORIGINS.includes(origin) ||
-    /^https:\/\/njpos(-portal|-owner|-pwa|-dev|-landing)?(-[a-z0-9]+)?\.vercel\.app$/.test(origin);
+    /^https:\/\/njpos(-portal|-owner|-pwa|-dev|-landing)?(-[a-z0-9]+)*\.vercel\.app$/.test(origin);
 
   if (allowed) {
     res.setHeader("Access-Control-Allow-Origin", origin);
