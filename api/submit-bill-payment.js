@@ -87,7 +87,6 @@ export default async function handler(req, res) {
 
   const { storeId, storeName, customerEmail, amount, breakdown, screenshotBase64 } = req.body || {};
 
-  if (!storeId) return res.status(400).json({ error: "Missing store" });
   if (!customerEmail || !/\S+@\S+\.\S+/.test(customerEmail)) {
     return res.status(400).json({ error: "Invalid email address" });
   }
