@@ -114,42 +114,47 @@ export default function BillPaymentApp() {
               <div style={{ background: "#f5f3ff", border: "1px solid #e0e7ff", borderRadius: 12, padding: 18, marginBottom: 22 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 10 }}>Amount Due</div>
                 {breakdown.length > 0 ? (() => {
-                  // Group items by store — headers have amount===0 and label starting with ──
                   const groups = [];
                   let current = null;
+                  const isHeader = (label) => label?.startsWith("[[") && label?.endsWith("]]");
+                  const getHeaderName = (label) => label.slice(2, -2).trim();
                   for (const item of breakdown) {
-                    if (item.label?.startsWith("──")) {
-                      current = { name: item.label.replace("──", "").trim(), items: [] };
+                    if (isHeader(item.label)) {
+                      current = { name: getHeaderName(item.label), items: [] };
                       groups.push(current);
                     } else if (current) {
                       current.items.push(item);
                     } else {
-                      // Single-store flat list — no headers
                       if (!groups.length) groups.push({ name: null, items: [] });
                       groups[0].items.push(item);
                     }
                   }
-                  const isMulti = groups.length > 1 || groups[0]?.name;
+                  const isMulti = groups.length > 1 || groups[0]?.name != null;
+                  const rows = [];
+                  groups.forEach((group, gi) => {
+                    if (isMulti) {
+                      rows.push(<tr key={`h${gi}`}>
+                        <td colSpan={2} style={{ paddingTop: gi > 0 ? 12 : 0, paddingBottom: 4, fontWeight: 800, fontSize: 13, color: "#1e3a5f", borderTop: gi > 0 ? "1px solid #ddd6fe" : "none" }}>{group.name}</td>
+                      </tr>);
+                    }
+                    group.items.forEach((item, i) => {
+                      rows.push(<tr key={`${gi}-${i}`}>
+                        <td style={{ padding: "3px 0 3px 12px", fontSize: 13, color: "#374151" }}>{item.label.trim()}</td>
+                        <td style={{ padding: "3px 0", fontSize: 13, color: "#374151", textAlign: "right", whiteSpace: "nowrap" }}>{fmt(item.amount)}</td>
+                      </tr>);
+                    });
+                    if (isMulti) {
+                      const sub = group.items.reduce((s, i) => s + (Number(i.amount) || 0), 0);
+                      rows.push(<tr key={`sub${gi}`}>
+                        <td style={{ padding: "4px 0 4px 12px", fontSize: 12, color: "#6b7280", fontStyle: "italic" }}>Subtotal</td>
+                        <td style={{ padding: "4px 0", fontSize: 12, color: "#374151", textAlign: "right", fontWeight: 700 }}>{fmt(sub)}</td>
+                      </tr>);
+                    }
+                  });
                   return (
                     <table style={{ width: "100%", borderCollapse: "collapse" }}>
                       <tbody>
-                        {groups.map((group, gi) => (
-                          <>
-                            {isMulti && <tr key={`h${gi}`}>
-                              <td colSpan={2} style={{ paddingTop: gi > 0 ? 12 : 0, paddingBottom: 4, fontWeight: 800, fontSize: 13, color: "#1e3a5f", borderTop: gi > 0 ? "1px solid #ddd6fe" : "none" }}>{group.name}</td>
-                            </tr>}
-                            {group.items.map((item, i) => (
-                              <tr key={`${gi}-${i}`}>
-                                <td style={{ padding: "3px 0 3px 12px", fontSize: 13, color: "#374151" }}>{item.label.trim()}</td>
-                                <td style={{ padding: "3px 0", fontSize: 13, color: "#374151", textAlign: "right", whiteSpace: "nowrap" }}>{fmt(item.amount)}</td>
-                              </tr>
-                            ))}
-                            {isMulti && <tr key={`s${gi}`}>
-                              <td style={{ padding: "3px 0 3px 12px", fontSize: 12, color: "#6b7280", fontStyle: "italic" }}>Subtotal</td>
-                              <td style={{ padding: "3px 0", fontSize: 12, color: "#6b7280", textAlign: "right", fontWeight: 700 }}>{fmt(group.items.reduce((s, i) => s + (Number(i.amount) || 0), 0))}</td>
-                            </tr>}
-                          </>
-                        ))}
+                        {rows}
                         <tr><td colSpan={2} style={{ borderTop: "2px solid #ddd6fe", paddingTop: 8 }} /></tr>
                         <tr>
                           <td style={{ fontWeight: 800, fontSize: 16, color: "#111" }}>Total</td>
