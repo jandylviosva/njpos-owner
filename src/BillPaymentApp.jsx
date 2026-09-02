@@ -83,7 +83,7 @@ export default function BillPaymentApp() {
   // A store link missing entirely (someone opened this with no
   // parameters at all, not a real link from a reminder email) shouldn't
   // show a confusing broken form.
-  if (!storeId || !lockedAmount) {
+  if (!lockedAmount) {
     return (
       <div style={{ minHeight: "100vh", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", padding: 24, textAlign: "center" }}>
         <div>
