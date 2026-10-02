@@ -55,11 +55,26 @@ async function supaStores(path, init) {
   });
 }
 
-async function sendResendEmail(RESEND_KEY, { to, subject, html }) {
+// Report emails may carry ONE PDF copy of the report, built by the POS app. This endpoint is
+// public, so the attachment is checked hard: a single file, ".pdf" name, real PDF bytes, size cap.
+// Anything that doesn't pass is simply left off; the email itself still goes out.
+const MAX_PDF_BASE64 = 3_000_000;
+function safePdfAttachments(input) {
+  if (!Array.isArray(input) || input.length !== 1) return undefined;
+  const a = input[0];
+  if (!a || typeof a.content !== "string" || typeof a.filename !== "string") return undefined;
+  if (a.content.length === 0 || a.content.length > MAX_PDF_BASE64) return undefined;
+  if (!/^[A-Za-z0-9+/=]+$/.test(a.content)) return undefined;
+  if (Buffer.from(a.content.slice(0, 16), "base64").subarray(0, 5).toString("latin1") !== "%PDF-") return undefined;
+  const base = a.filename.replace(/\.pdf$/i, "").replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "Report";
+  return [{ filename: base + ".pdf", content: a.content }];
+}
+
+async function sendResendEmail(RESEND_KEY, { to, subject, html, attachments }) {
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${RESEND_KEY}` },
-    body: JSON.stringify({ from: "NJ POS <noreply@mail.nj-systems.com>", reply_to: "pos_support@nj-systems.com", to: [to], subject, html }),
+    body: JSON.stringify({ from: "NJ POS <noreply@mail.nj-systems.com>", reply_to: "pos_support@nj-systems.com", to: [to], subject, html, ...(attachments ? { attachments } : {}) }),
   });
   return r;
 }
@@ -76,7 +91,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { action, email, storeName, purpose, reportTitle, reportHtml } = req.body || {};
+  const { action, email, storeName, purpose, reportTitle, reportHtml, attachments: rawAttachments } = req.body || {};
 
   if (!email) {
     return res.status(400).json({ error: "Missing email" });
@@ -89,7 +104,8 @@ export default async function handler(req, res) {
     if (!RESEND_KEY) return res.status(500).json({ error: "Resend not configured" });
     if (!reportHtml) return res.status(400).json({ error: "Missing report content" });
     try {
-      const r = await sendResendEmail(RESEND_KEY, {
+      const attachments = safePdfAttachments(rawAttachments);
+      const message = {
         to: email,
         subject: `NJ POS Report: ${reportTitle||"Report"}${storeName ? " — " + storeName : ""}`,
         html: `<div style="font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:24px">
@@ -101,10 +117,18 @@ export default async function handler(req, res) {
           ${reportHtml}
           <p style="color:#9ca3af;font-size:11px;margin-top:24px">This report was generated from NJ POS and sent to your registered email.</p>
           <div style="margin-top:12px;padding:10px 14px;background:#f5f3ff;border-radius:8px;font-size:11px;color:#5b21b6">
-            💡 <b>To save as PDF:</b> Open the POS app → Reports → View Report → Save as PDF
+            ${attachments
+              ? "📎 <b>A PDF copy of this report is attached</b> with all the details."
+              : "💡 <b>To save as PDF:</b> Open the POS app → Reports → View Report → Save as PDF"}
           </div>
         </div>`,
-      });
+      };
+      let r = await sendResendEmail(RESEND_KEY, { ...message, attachments });
+      if (!r.ok && attachments) {
+        // never lose the report because of the attachment: retry once without it
+        message.html = message.html.replace("📎 <b>A PDF copy of this report is attached</b> with all the details.", "💡 <b>To save as PDF:</b> Open the POS app → Reports → View Report → Save as PDF");
+        r = await sendResendEmail(RESEND_KEY, message);
+      }
       const data = await r.json();
       if (!r.ok) return res.status(500).json({ error: "Failed to send report", detail: data });
       return res.status(200).json({ ok: true });

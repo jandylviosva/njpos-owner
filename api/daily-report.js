@@ -5,6 +5,8 @@
 // covering "today so far" in PHT (orders from midnight PHT up to send time).
 // Uses the Supabase SERVICE key — never the anon key.
 
+import { buildDailyReportPdf, dailyReportPdfName } from "./_dailyReportPdf.js";
+
 const SUPA_URL         = process.env.SUPA_URL         || process.env.VITE_SUPA_URL;
 const SUPA_SERVICE_KEY = process.env.SUPA_SERVICE_KEY;
 const RESEND_KEY       = process.env.RESEND_KEY;
@@ -74,8 +76,8 @@ async function supaUpdateOrderSettings(storeId, orderSettings) {
   return r.ok;
 }
 
-async function sendEmail(to, subject, html) {
-  const r = await fetch("https://api.resend.com/emails", {
+async function sendEmail(to, subject, html, attachments) {
+  const post = (payload) => fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -86,11 +88,19 @@ async function sendEmail(to, subject, html) {
       reply_to: "pos_support@nj-systems.com",
       to: [to],
       subject,
-      html,
+      ...payload,
     }),
   });
+  let r = await post(attachments?.length ? { html, attachments } : { html: html.replace(PDF_NOTE, "") });
+  if (!r.ok && attachments?.length) {
+    // the PDF is a bonus: if Resend refuses it, still deliver the summary email
+    console.error("[daily-report] send with PDF failed, retrying without it:", await r.clone().text().catch(() => ""));
+    r = await post({ html: html.replace(PDF_NOTE, "") });
+  }
   return r.ok;
 }
+
+const PDF_NOTE = `<div style="background:#f5f3ff;border-radius:8px;padding:10px 14px;margin:0 0 20px;font-size:12px;color:#5b21b6">📎 <b>The full details are in the attached PDF</b>: every order, every product sold and every expense.</div>`;
 
 function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses, reportKey, payMethods) {
   const paid = orders.filter(o => o.status === "paid");
@@ -205,6 +215,7 @@ function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses,
 
       <h2 style="font-size:16px;color:#111;margin:0 0 4px">Daily Sales Report</h2>
       <p style="color:#9ca3af;font-size:12px;margin:0 0 20px">${todayLabel}</p>
+      ${PDF_NOTE}
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px">
         <div style="background:#f0fdf4;border-radius:10px;padding:14px;text-align:center">
@@ -366,8 +377,20 @@ export default async function handler(req, res) {
     const html = buildReportHtml(storeName, todayLabel, todayOrders, allProducts, allStoreExpenses, reportKey, payMethods);
     const subject = `Daily Sales Report — ${todayLabel} · ${storeName}`;
 
+    // Detailed PDF: if it can't be built the summary email still goes out without it.
+    let attachments;
     try {
-      const ok = await sendEmail(os.reportEmail, subject, html);
+      const content = await buildDailyReportPdf({
+        storeName, dateLabel: todayLabel, reportKey,
+        orders: todayOrders, products: allProducts, storeExpenses: allStoreExpenses, payMethods,
+      });
+      attachments = [{ filename: dailyReportPdfName(reportKey, storeName), content }];
+    } catch (e) {
+      console.error(`[daily-report] PDF failed for store ${row.store_id}:`, e?.message || e);
+    }
+
+    try {
+      const ok = await sendEmail(os.reportEmail, subject, html, attachments);
       if (ok) {
         // Write lastReportSentDate back so we don't double-send this hour
         const updatedOs = { ...os, lastReportSentDate: todayKey };
