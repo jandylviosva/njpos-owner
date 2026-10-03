@@ -83,7 +83,7 @@ export function trialEmailHtml({ code, ownerName }) {
     <ol style="color:#374151;font-size:14px;line-height:1.8;padding-left:20px">
       <li>Open <a href="https://warehouse.nj-systems.com" style="color:#2563EB">warehouse.nj-systems.com</a></li>
       <li>Choose <b>Register</b> and enter your details and this code</li>
-      <li>The trial includes <b>1 device</b>. Your ${TRIAL_DAYS} days start the moment you register.</li>
+      <li>The trial includes <b>1 device</b>. Your ${TRIAL_DAYS} days start the moment you register. This code is only for creating your account, once.</li>
     </ol>
     <p style="color:#6b7280;font-size:13px;line-height:1.6">To keep your warehouse after the trial, get a plan from <a href="https://www.nj-systems.com/#warehouse" style="color:#2563EB">nj-systems.com</a> (${peso(BASE_PRICE)}/month with 1 device, ${peso(EXTRA_DEVICE_PRICE)} for each additional device). If you have questions, just reply to this email.</p>`);
 }
