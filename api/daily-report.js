@@ -317,13 +317,18 @@ function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses,
 }
 
 export default async function handler(req, res) {
-  // Vercel cron requests are GET with a special header.
-  // Also allow POST for manual testing from the owner portal or curl.
+  // Only Vercel's cron may run this (it used to run for any GET or POST, so anyone who found the URL
+  // could trigger the reports). With CRON_SECRET set in Vercel the call must carry it (Vercel adds the
+  // header itself); without it, the request must at least look like Vercel's cron runner.
   if (req.method !== "GET" && req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
-
-  // No auth check — Vercel cron runner uses GET, manual trigger uses POST
+  const secret = process.env.CRON_SECRET;
+  const auth = String(req.headers?.authorization || "");
+  const isCron = secret
+    ? auth === `Bearer ${secret}`
+    : String(req.headers?.["user-agent"] || "").startsWith("vercel-cron") || req.headers?.["x-vercel-cron"] === "1";
+  if (!isCron) return res.status(403).json({ error: "Forbidden" });
 
   if (!SUPA_URL || !SUPA_SERVICE_KEY) {
     return res.status(500).json({ error: "Supabase not configured" });
