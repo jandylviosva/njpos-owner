@@ -5,6 +5,7 @@
 // covering "today so far" in PHT (orders from midnight PHT up to send time).
 // Uses the Supabase SERVICE key — never the anon key.
 
+import { reportRecipients } from "./_reportEmails.js";
 import { buildDailyReportPdf, dailyReportPdfName } from "./_dailyReportPdf.js";
 
 const SUPA_URL         = process.env.SUPA_URL         || process.env.VITE_SUPA_URL;
@@ -86,7 +87,7 @@ async function sendEmail(to, subject, html, attachments) {
     body: JSON.stringify({
       from: "NJ POS <noreply@mail.nj-systems.com>",
       reply_to: "pos_support@nj-systems.com",
-      to: [to],
+      to: Array.isArray(to) ? to : [to],
       subject,
       ...payload,
     }),
@@ -360,7 +361,8 @@ export default async function handler(req, res) {
 
     // Skip stores that haven't opted in
     if (!os.reportEnabled)              { results.skipped++; continue; }
-    if (!os.reportEmail?.includes("@")) { results.skipped++; continue; }
+    const recipients = reportRecipients(os.reportEmail);
+    if (!recipients.length)             { results.skipped++; continue; }
 
     // Already sent today's report?
     if (os.lastReportSentDate === todayKey) { results.skipped++; continue; }
@@ -390,13 +392,13 @@ export default async function handler(req, res) {
     }
 
     try {
-      const ok = await sendEmail(os.reportEmail, subject, html, attachments);
+      const ok = await sendEmail(recipients, subject, html, attachments);
       if (ok) {
         // Write lastReportSentDate back so we don't double-send this hour
         const updatedOs = { ...os, lastReportSentDate: todayKey };
         await supaUpdateOrderSettings(row.store_id, updatedOs);
         results.sent++;
-        console.log(`[daily-report] Sent to ${os.reportEmail} for store ${row.store_id}`);
+        console.log(`[daily-report] Sent to ${recipients.join(", ")} for store ${row.store_id}`);
       } else {
         results.errors++;
         console.error(`[daily-report] Resend failed for store ${row.store_id}`);
