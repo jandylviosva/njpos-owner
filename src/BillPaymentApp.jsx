@@ -9,7 +9,9 @@ const fmt = (n) => `₱${Number(n || 0).toLocaleString("en-PH", { minimumFractio
 export default function BillPaymentApp() {
   const params = new URLSearchParams(window.location.search);
   const storeId = params.get("store") || "";
-  const storeName = params.get("storeName") || "your store";
+  const warehouseId = params.get("warehouse") || "";      // a reminder for an NJ Warehouse account
+  const isWarehouse = !!warehouseId;
+  const storeName = params.get("storeName") || (isWarehouse ? "your warehouse" : "your store");
   const lockedAmount = Number(params.get("amount")) || 0;
   // Breakdown travels as base64-encoded JSON in the link, exactly the
   // same line items shown in the reminder email — not re-fetched from
@@ -64,6 +66,7 @@ export default function BillPaymentApp() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           storeId,
+          warehouseId,
           storeName,
           customerEmail: email.trim(),
           amount: lockedAmount,
@@ -99,10 +102,10 @@ export default function BillPaymentApp() {
       <div style={{ maxWidth: 480, margin: "0 auto" }}>
         <div style={{ textAlign: "center", marginBottom: 30 }}>
           <div style={{ width: 56, height: 56, borderRadius: 14, overflow: "hidden", margin: "0 auto 12px" }}>
-            <img src="/icons/icon-192.png" alt="NJ POS" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <img src="/icons/icon-192.png" alt={isWarehouse ? "NJ Warehouse" : "NJ POS"} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           </div>
-          <div style={{ fontFamily: "'Michroma',sans-serif", fontSize: 20, letterSpacing: 1 }}><span style={{color:"#2563EB"}}>NJ</span><span style={{color:"#0F172A"}}>POS</span></div>
-          <div style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 500, fontSize: 10, color: "#6b7280", marginTop: 6, letterSpacing: 0.5 }}>SMART POS. BETTER BUSINESS.</div>
+          <div style={{ fontFamily: "'Michroma',sans-serif", fontSize: 20, letterSpacing: 1 }}><span style={{color:"#2563EB"}}>NJ</span><span style={{color:"#0F172A"}}>{isWarehouse ? "WAREHOUSE" : "POS"}</span></div>
+          <div style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 500, fontSize: 10, color: "#6b7280", marginTop: 6, letterSpacing: 0.5 }}>{isWarehouse ? "SMART WAREHOUSE. BETTER SUPPLY." : "SMART POS. BETTER BUSINESS."}</div>
         </div>
 
         <div style={{ background: "#fff", borderRadius: 18, padding: "30px 26px", boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}>
