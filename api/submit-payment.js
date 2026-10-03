@@ -236,7 +236,7 @@ export default async function handler(req, res) {
             </div>
             <p style="color:#6b7280;font-size:13px;margin:20px 0 0">Review and confirm this in the Dev Console → Payments.</p>
           </div>
-          <p style="color:#9ca3af;font-size:11px;text-align:center;margin-top:20px">This is an automatic notification from your NJ POS payment page.</p>
+          <p style="color:#9ca3af;font-size:11px;text-align:center;margin-top:20px">This is an automatic notification from your NJ POS payment page.<br/>— NJ Systems</p>
         </div>`,
       });
     } catch { /* notification failure is non-fatal */ }

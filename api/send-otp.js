@@ -115,7 +115,7 @@ export default async function handler(req, res) {
           </div>
           <h2 style="font-size:16px;color:#111;margin-bottom:16px">${reportTitle||"Report"}</h2>
           ${reportHtml}
-          <p style="color:#9ca3af;font-size:11px;margin-top:24px">This report was generated from NJ POS and sent to your registered email.</p>
+          <p style="color:#9ca3af;font-size:11px;margin-top:24px">This report was generated from NJ POS and sent to your registered email.<br/>— NJ Systems</p>
           <div style="margin-top:12px;padding:10px 14px;background:#f5f3ff;border-radius:8px;font-size:11px;color:#5b21b6">
             ${attachments
               ? "📎 <b>A PDF copy of this report is attached</b> with all the details."
