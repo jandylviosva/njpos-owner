@@ -21,6 +21,10 @@
       "destination": "/bookings.html"
     },
     {
+      "source": "/warehouse-payment",
+      "destination": "/warehouse-payment.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

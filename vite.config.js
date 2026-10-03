@@ -11,6 +11,7 @@ export default defineConfig({
         billPayment: resolve(__dirname, 'bill-payment.html'),
         bookings: resolve(__dirname, 'bookings.html'),
         bookingsPay: resolve(__dirname, 'bookings-pay.html'),
+        warehousePayment: resolve(__dirname, 'warehouse-payment.html'),
       },
     },
   },
