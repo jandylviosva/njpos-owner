@@ -309,7 +309,7 @@ function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses,
       </table>` : ""}
 
       <p style="color:#9ca3af;font-size:11px;margin-top:24px;border-top:1px solid #f3f4f6;padding-top:16px">
-        Sent automatically by NJ POS · ${new Date().toLocaleString("en-PH", { timeZone: "Asia/Manila" })}
+        Sent automatically by NJ Systems · ${new Date().toLocaleString("en-PH", { timeZone: "Asia/Manila" })}
         <br>To change your report schedule: POS app → Settings → Order Settings → Scheduled Daily Report
       </p>
     </div>`;

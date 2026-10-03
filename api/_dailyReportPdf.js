@@ -21,11 +21,6 @@ async function fetchLogo() {
   } catch { return null; }
 }
 
-const itemsText = (o) =>
-  (o.items || [])
-    .map((i) => `${i.name || "Item"}${i.variantLabel ? ` (${i.variantLabel})` : ""} x${i.qty || 1}`)
-    .join(", ");
-
 // "10/2/2026, 10:30:00 AM" -> "10:30 AM"
 const timeOf = (o) => {
   const part = String(o.date || "").split(",")[1];
@@ -74,7 +69,7 @@ export async function buildDailyReportPdf({ storeName, dateLabel, reportKey, ord
   const rep = await PdfReport.create({
     title: "Daily Sales Report",
     subtitle: `${dateLabel}  -  ${storeName}`,
-    landscape: true,
+    landscape: false,
     logoBytes: await fetchLogo(),
     footer: `${storeName}  |  Daily Sales Report ${dateLabel}  |  Sent automatically by NJ POS`,
   });
@@ -151,20 +146,19 @@ export async function buildDailyReportPdf({ storeName, dateLabel, reportKey, ord
   if (sorted.length) {
     rep.table({
       columns: [
-        { header: "Time", w: 1.2 }, { header: "Order", w: 2.2 }, { header: "Cashier", w: 1.8 }, { header: "Type", w: 1.4 },
-        { header: "Items", w: 7 }, { header: "Payment", w: 1.4 },
-        { header: "Discount", w: 1.3, align: "right" }, { header: "Total", w: 1.6, align: "right" },
+        { header: "Time", w: 1.3 }, { header: "Order", w: 2.8 }, { header: "Cashier", w: 2 }, { header: "Type", w: 2.3 },
+        { header: "Payment", w: 1.8 },
+        { header: "Discount", w: 1.5, align: "right" }, { header: "Total", w: 1.8, align: "right" },
       ],
-      fontSize: 7.5,
+      fontSize: 8,
       rows: sorted.map((o) => [
-        timeOf(o), o.id || "", o.cashier || "",
+        timeOf(o), (o.id || "") + (o.notes ? `\n[Note: ${o.notes}]` : ""), o.cashier || "",
         [o.orderType, o.orderSource].filter(Boolean).join(" / ") || "-",
-        itemsText(o) + (o.notes ? `  [Note: ${o.notes}]` : ""),
         labelForMethod(o.payMethod, payMethods) + (o.refNum ? ` #${o.refNum}` : ""),
         o.discountAmt ? peso(o.discountAmt) : "",
         { text: peso(o.total), bold: true, align: "right" },
       ]),
-      total: [{ text: "Total", bold: true, span: 7 }, { text: peso(totalSales), bold: true, align: "right" }],
+      total: [{ text: "Total", bold: true, span: 6 }, { text: peso(totalSales), bold: true, align: "right" }],
     });
   } else {
     rep.text("No paid orders for this day.");
