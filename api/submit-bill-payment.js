@@ -85,7 +85,8 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { storeId, storeName, customerEmail, amount, breakdown, screenshotBase64 } = req.body || {};
+  const { storeId, warehouseId, storeName, customerEmail, amount, breakdown, screenshotBase64 } = req.body || {};
+  const isWarehouse = !!warehouseId;
 
   if (!customerEmail || !/\S+@\S+\.\S+/.test(customerEmail)) {
     return res.status(400).json({ error: "Invalid email address" });
@@ -103,21 +104,25 @@ export default async function handler(req, res) {
 
   const notesLines = (breakdown || []).map(i => `${i.label}: ${fmtPeso(i.amount)}`).join("\n");
 
-  const createRes = await supaTable("payment_records", "", {
-    method: "POST",
-    body: JSON.stringify([{
-      source: "bill_payment",
-      store_id: storeId,
-      customer_email: customerEmail,
-      store_name: storeName || null,
-      amount: Number(amount) || 0,
-      plan: "standard_monthly",
-      method: "GCash",
-      notes: notesLines || null,
-      screenshot_url: screenshotPath,
-      status: "pending",
-    }]),
-  });
+  const record = {
+    source: "bill_payment",
+    store_id: isWarehouse ? null : storeId,
+    ...(isWarehouse ? { warehouse_id: warehouseId } : {}),
+    customer_email: customerEmail,
+    store_name: storeName || null,
+    amount: Number(amount) || 0,
+    plan: isWarehouse ? "warehouse_monthly" : "standard_monthly",
+    method: "GCash",
+    notes: notesLines || null,
+    screenshot_url: screenshotPath,
+    status: "pending",
+  };
+  let createRes = await supaTable("payment_records", "", { method: "POST", body: JSON.stringify([record]) });
+  if (!createRes.ok && isWarehouse) {
+    // supabase-warehouse-payments.sql (dev console repo) hasn't been run yet: keep the payment, marked in the notes
+    const { warehouse_id, ...rest } = record;
+    createRes = await supaTable("payment_records", "", { method: "POST", body: JSON.stringify([{ ...rest, notes: `[NJ Warehouse ${warehouseId}]\n${notesLines || ""}`.trim() }]) });
+  }
 
   if (!createRes.ok) {
     const t = await createRes.text().catch(() => "");
@@ -129,15 +134,15 @@ export default async function handler(req, res) {
     try {
       await sendResendEmail(RESEND_KEY, {
         to: OWNER_NOTIFY_EMAIL,
-        subject: `Bill payment received — ${storeName || "a store"} (${fmtPeso(amount)})`,
+        subject: `Bill payment received — ${storeName || (isWarehouse ? "a warehouse" : "a store")} (${fmtPeso(amount)})`,
         html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f9fafb">
           <div style="background:#0F172A;border-radius:12px;padding:20px;text-align:center;margin-bottom:24px">
-            <img src="https://owner.nj-systems.com/email-logo.png" alt="NJ POS" width="183" height="55" style="display:block;margin:0 auto;"/>
+            ${isWarehouse ? `<img src="https://warehouse.nj-systems.com/email-logo-warehouse.png" alt="NJ Warehouse" width="272" height="55" style="display:block;margin:0 auto;"/>` : `<img src="https://owner.nj-systems.com/email-logo.png" alt="NJ POS" width="183" height="55" style="display:block;margin:0 auto;"/>`}
           </div>
           <div style="background:#fff;border-radius:12px;padding:24px;border:1px solid #e5e7eb">
             <h2 style="color:#111;margin:0 0 12px;font-size:19px">Bill payment received</h2>
             <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 20px">
-              <b>${storeName || "A store"}</b> submitted their monthly bill payment. Paid by: <a href="mailto:${customerEmail}" style="color:#2563EB;text-decoration:none">${customerEmail}</a>.
+              <b>${storeName || (isWarehouse ? "A warehouse" : "A store")}</b> submitted their monthly bill payment${isWarehouse ? " for NJ Warehouse" : ""}. Paid by: <a href="mailto:${customerEmail}" style="color:#2563EB;text-decoration:none">${customerEmail}</a>.
             </p>
             <div style="background:#f5f3ff;border:1px solid #e0e7ff;border-radius:10px;padding:18px">
               <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px">Breakdown</div>
@@ -147,7 +152,7 @@ export default async function handler(req, res) {
                 <tr><td style="font-weight:800;font-size:16px;color:#111">Total</td><td style="font-weight:800;font-size:16px;color:#2563EB;text-align:right;white-space:nowrap">${fmtPeso(amount)}</td></tr>
               </table>
             </div>
-            <p style="color:#6b7280;font-size:13px;margin:20px 0 0">Review and confirm this in the Dev Console → Payments — confirming it will automatically advance this store's next due date.</p>
+            <p style="color:#6b7280;font-size:13px;margin:20px 0 0">Review and confirm this in the Dev Console → Payments — confirming it records the payment.</p>
           </div>
           <p style="color:#9ca3af;font-size:11px;text-align:center;margin-top:20px">This is an automatic notification from your NJ POS bill payment page.<br/>— NJ Systems</p>
         </div>`,
