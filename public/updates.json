@@ -1,0 +1,15 @@
+[
+  {"build":"2026-10-03.11","date":"2026-10-03","title":"Update notice moved to the corner","items":["The \"new version\" notice is now a small floating box at the top right, so it no longer sits behind other banners.","Closing the notice does not stop the update: it still installs by itself when the device is idle."]},
+  {"build":"2026-10-03.10","date":"2026-10-03","title":"Safer developer support","items":["Developer support sessions use their own temporary device, so a real device of your store is never renamed or removed.","Update checks now compare build numbers correctly (build 10 is newer than build 9)."]},
+  {"build":"2026-10-03.9","date":"2026-10-03","title":"Developer access: View and Support","items":["Read-only View and full Support are separate options, and View can show the app as a chosen device and its signed-in user without changing anything."]},
+  {"build":"2026-10-03.8","date":"2026-10-03","title":"Developer access banner","items":["Developer access shows a floating banner with the store, end time and an Exit button."]},
+  {"build":"2026-10-03.7","date":"2026-10-03","title":"Ongoing shift reminder","items":["If a shift from an earlier day is still open, a popup shows when it started and lets you continue it or end it.","The shift popup also appears after a restored login."]},
+  {"build":"2026-10-03.6","date":"2026-10-03","title":"Portrait reports","items":["Report PDFs from the POS are always portrait."]},
+  {"build":"2026-10-03.5","date":"2026-10-03","title":"Supplier printing","items":["Printing moved into the supplier catalog views; a warehouse catalog prints its own products."]},
+  {"build":"2026-10-03.4","date":"2026-10-03","title":"Purchase orders","items":["A supplier with a price list only offers the items on that list."]},
+  {"build":"2026-10-03.3","date":"2026-10-03","title":"Purchase orders to a connected warehouse","items":["Items must be picked from the warehouse price list, at the warehouse's prices."]},
+  {"build":"2026-10-03.2","date":"2026-10-03","title":"Warehouse connection","items":["Connecting falls back to the company name when needed."]},
+  {"build":"2026-10-03.1","date":"2026-10-03","title":"Warehouse orders","items":["Warehouse orders show status badges and refresh by themselves.","Mark Sent sends first and shows clear errors if it fails."]},
+  {"build":"2026-10-02.9","date":"2026-10-02","title":"Automatic updates","items":["Idle devices install a waiting update by themselves, never during an open sale."]},
+  {"build":"2026-10-02.5","date":"2026-10-02","title":"End-of-shift report","items":["End of shift has an \"Email me\" button that sends the shift report with a PDF copy to the account email.","The shift report lists products sold."]}
+]
