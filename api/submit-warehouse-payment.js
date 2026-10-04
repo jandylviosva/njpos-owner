@@ -31,16 +31,19 @@ export default async function handler(req, res) {
   });
   if (!created.ok) return res.status(500).json({ error: "Could not record your payment. Please try again." });
 
+  // Both emails are awaited: Vercel freezes the function as soon as it replies, which silently drops unsent mail.
   // to the customer: we got it
-  sendWarehouseEmail({ to: mail, subject: "We received your NJ Warehouse payment", html: emailFrame(`
+  const toCustomer = sendWarehouseEmail({ to: mail, subject: "We received your NJ Warehouse payment", html: emailFrame(`
     <h2 style="color:#111">Thank you, we received your payment</h2>
     <p style="color:#374151;font-size:15px;line-height:1.6">Hi ${esc(who)}, we received your GCash payment of <b>${peso(amount)}</b> for <b>${esc(biz)}</b> (${n} device${n === 1 ? "" : "s"}).</p>
     <p style="color:#374151;font-size:15px;line-height:1.6">We will check it and email your <b>registration code</b> to this address, usually within a few hours. Then open <a href="https://warehouse.nj-systems.com" style="color:#2563EB">warehouse.nj-systems.com</a>, choose Register and enter the code.</p>`) }).catch(() => {});
   // to the owner: a payment to check
-  sendWarehouseEmail({ to: OWNER_NOTIFY_EMAIL, subject: `NJ Warehouse payment — ${biz} (${peso(amount)})`, html: emailFrame(`
+  const toOwner = sendWarehouseEmail({ to: OWNER_NOTIFY_EMAIL, subject: `NJ Warehouse payment — ${biz} (${peso(amount)})`, html: emailFrame(`
     <h2 style="color:#111;font-size:18px">New NJ Warehouse payment</h2>
     <p style="color:#374151;font-size:14px;line-height:1.7"><b>${esc(biz)}</b> · ${esc(who)} · <a href="mailto:${esc(mail)}">${esc(mail)}</a><br/>${n} device${n === 1 ? "" : "s"} · <b>${peso(amount)}</b> by GCash</p>
     <p style="color:#6b7280;font-size:13px">Check the screenshot in Dev Console, Payments, then press Create &amp; send code.</p>`) }).catch(() => {});
+
+  await Promise.all([toCustomer, toOwner]);
 
   return res.status(200).json({ ok: true, amount });
 }
