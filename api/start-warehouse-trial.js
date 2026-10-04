@@ -43,7 +43,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "We couldn't send the email. Please check the address and try again." });
     }
     // heads-up to the owner (not important if it fails)
-    sendWarehouseEmail({ to: OWNER_NOTIFY_EMAIL, subject: `New NJ Warehouse trial — ${biz}`, html: emailFrame(`<h2 style="color:#111;font-size:18px">New NJ Warehouse free trial</h2><p style="color:#374151;font-size:14px;line-height:1.7"><b>${esc(biz)}</b><br/>${esc(who)} · ${esc(mail)}<br/>Code: <b style="font-family:monospace">${esc(lic.code)}</b> (${TRIAL_DAYS} days from registration)</p>`) }).catch(() => {});
+    await sendWarehouseEmail({ to: OWNER_NOTIFY_EMAIL, subject: `New NJ Warehouse trial — ${biz}`, html: emailFrame(`<h2 style="color:#111;font-size:18px">New NJ Warehouse free trial</h2><p style="color:#374151;font-size:14px;line-height:1.7"><b>${esc(biz)}</b><br/>${esc(who)} · ${esc(mail)}<br/>Code: <b style="font-family:monospace">${esc(lic.code)}</b> (${TRIAL_DAYS} days from registration)</p>`) }).catch(() => {});
     return res.status(200).json({ ok: true });
   } catch (e) {
     console.error("[start-warehouse-trial]", e);
