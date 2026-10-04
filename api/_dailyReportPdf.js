@@ -2,6 +2,7 @@
 // products, totals); this has the whole day: every order, every product sold, every expense.
 // The leading underscore keeps Vercel from exposing this file as a route.
 import { PdfReport } from "./_pdfKit.js";
+import { discountSummary, discountLines } from "./_discounts.js";
 
 const peso = (n) =>
   "₱" + (Number(n) || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -82,6 +83,26 @@ export async function buildDailyReportPdf({ storeName, dateLabel, reportKey, ord
     { label: "Net Sales (cash on hand + other payments)", value: peso(netSales), col: netSales >= 0 ? good : bad, bg: netSales >= 0 ? "#f0fdf4" : "#fef2f2" },
     { label: "Voided orders", value: String(voided.length), col: voided.length ? bad : "#6b7280", bg: "#f9fafb" },
   ], 3);
+
+  // discounts given: sales before discounts, each kind, the total and what is left
+  const disc = discountSummary(paid);
+  if (disc.total > 0) {
+    rep.heading("Discounts given");
+    const red = "#991b1b";
+    const rows = [
+      [{ text: "Sales before discounts", bold: true }, { text: "", }, { text: peso(disc.gross), bold: true, align: "right" }],
+      ...discountLines(disc).map(([l, v, n, col]) => [{ text: l, col }, { text: `${n} order${n === 1 ? "" : "s"}`, align: "right", col: "#6b7280" }, { text: "-" + peso(v), align: "right", col }]),
+      [{ text: "Total discounts", bold: true, col: red }, { text: `${disc.orders} of ${disc.orderCount} orders`, align: "right", col: "#6b7280" }, { text: "-" + peso(disc.total), bold: true, align: "right", col: red }],
+      ...(disc.vatAdded > 0.005 ? [[{ text: "Add: VAT" }, { text: "" }, { text: peso(disc.vatAdded), align: "right" }]] : []),
+      [{ text: "Total Sales", bold: true }, { text: "" }, { text: peso(disc.sales), bold: true, align: "right" }],
+    ];
+    rep.table({ columns: [{ header: "", w: 6 }, { header: "Orders", w: 3, align: "right" }, { header: "Amount", w: 3, align: "right" }], rows });
+    const who = Object.entries(disc.byCashier).sort((a, b) => b[1].amount - a[1].amount);
+    if (who.length > 1) {
+      rep.heading("Discounts by cashier");
+      rep.table({ columns: [{ header: "Cashier", w: 6 }, { header: "Orders", w: 1, align: "right" }, { header: "Discounts", w: 2, align: "right" }], rows: who.map(([c, d]) => [c, String(d.orders), peso(d.amount)]) });
+    }
+  }
 
   // payment methods
   if (Object.keys(byMethod).length) {

@@ -7,6 +7,7 @@
 
 import { reportRecipients } from "./_reportEmails.js";
 import { buildDailyReportPdf, dailyReportPdfName } from "./_dailyReportPdf.js";
+import { discountSummary, discountLines } from "./_discounts.js";
 
 const SUPA_URL         = process.env.SUPA_URL         || process.env.VITE_SUPA_URL;
 const SUPA_SERVICE_KEY = process.env.SUPA_SERVICE_KEY;
@@ -107,6 +108,7 @@ function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses,
   const paid = orders.filter(o => o.status === "paid");
   const totalSales = paid.reduce((s, o) => s + (o.total || 0), 0);
   const orderCount = paid.length;
+  const disc = discountSummary(paid);
 
   // Shift expenses — cash expenses recorded during shifts for this day
   const shiftExpenses = paid.reduce((s, o) => {
@@ -242,6 +244,16 @@ function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses,
           <div style="font-size:10px;color:#6b7280;margin-top:4px">Cash on Hand + other payments</div>
         </div>
       </div>
+
+      ${disc.total > 0 ? `
+      <h3 style="font-size:13px;color:#374151;margin:0 0 8px">Discounts Given</h3>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #f3f4f6">
+        <tr><td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;color:#374151;font-weight:700">Sales before discounts</td><td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:700">${fmtPeso(disc.gross)}</td></tr>
+        ${discountLines(disc).map(([l, v, n, col]) => `<tr><td style="padding:6px 12px 6px 20px;border-bottom:1px solid #f9fafb;color:${col}">${l} <span style="color:#9ca3af;font-size:11px">· ${n} order${n === 1 ? "" : "s"}</span></td><td style="padding:6px 12px;border-bottom:1px solid #f9fafb;text-align:right;color:${col};font-weight:700">-${fmtPeso(v)}</td></tr>`).join("")}
+        <tr style="background:#fef2f2"><td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;color:#991b1b;font-weight:800">Total discounts <span style="font-weight:400;font-size:11px">· ${disc.orders} of ${disc.orderCount} orders</span></td><td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;color:#991b1b;font-weight:800">-${fmtPeso(disc.total)}</td></tr>
+        ${disc.vatAdded > 0.005 ? `<tr><td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;color:#6b7280">Add: VAT</td><td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;text-align:right">${fmtPeso(disc.vatAdded)}</td></tr>` : ""}
+        <tr><td style="padding:8px 12px;font-weight:800">Total Sales</td><td style="padding:8px 12px;text-align:right;font-weight:800">${fmtPeso(disc.sales)}</td></tr>
+      </table>` : ""}
 
       ${methodRows ? `
       <h3 style="font-size:13px;color:#374151;margin:0 0 8px">Payment Methods</h3>
