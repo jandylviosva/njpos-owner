@@ -412,7 +412,7 @@ export default function App(){
     {id:"reports",  icon:"ti-chart-bar",        label:"Reports"},
     {id:"inventory",icon:"ti-box",              label:"Inventory"},
     {id:"orders",   icon:"ti-receipt",          label:"Orders"},
-    ...(data?.enable_loyalty ? [{id:"loyalty", icon:"ti-gift", label:"Loyalty"}] : []),
+    {id:"loyalty", icon:"ti-gift", label:"Loyalty"},   // part of the POS for every store
     {id:"accounts", icon:"ti-users",            label:"Accounts"},
     {id:"settings", icon:"ti-settings",         label:"Settings"},
   ];
@@ -1353,9 +1353,10 @@ const computeRecipeCost = (p, allProducts) => {
 // isn't standing in front of them.
 function LoyaltyTab({data,primary}){
   const [search,setSearch]=useState("");
-  const customers=data?.customers||[];
+  // members only: invoice customers are a separate list and deleted members are hidden; promo vouchers are not rewards
+  const customers=(data?.customers||[]).filter(c=>c.kind!=="invoice"&&!c.deletedAt);
   const orders=data?.orders||[];
-  const rewards=data?.loyalty_rewards||[];
+  const rewards=(data?.loyalty_rewards||[]).filter(r=>r.kind!=="promo");
 
   const filtered=customers.filter(c=>
     !search.trim() || c.name?.toLowerCase().includes(search.toLowerCase()) || c.phone?.includes(search) || c.email?.toLowerCase().includes(search.toLowerCase())
