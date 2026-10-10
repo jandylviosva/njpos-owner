@@ -3,6 +3,7 @@
 // The leading underscore keeps Vercel from exposing this file as a route.
 import { PdfReport } from "./_pdfKit.js";
 import { discountSummary, discountLines } from "./_discounts.js";
+import { topSellers } from "./_bestsellers.js";
 
 const peso = (n) =>
   "₱" + (Number(n) || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -213,9 +214,21 @@ export async function buildDailyReportPdf({ storeName, dateLabel, reportKey, ord
     rep.text("All products are above their low stock level.", { col: "#059669" });
   }
 
+  // bestsellers: what sold the most this day (only products with a sale)
+  const best = topSellers((orders || []).filter((o) => o.status === "paid"), 8);
+  if (best.length) {
+    rep.heading(`Bestsellers (${best.length})`, 2, good);
+    rep.text("The products that sold the most this day.");
+    rep.table({
+      columns: [{ header: "#", w: 1 }, { header: "Product", w: 8 }, { header: "Sold", w: 2, align: "right" }, { header: "Sales", w: 2.5, align: "right" }],
+      rows: best.map((b, i) => [String(i + 1), b.name, { text: String(Number.isInteger(b.qty) ? b.qty : b.qty.toFixed(2)), bold: true, align: "right" }, { text: peso(b.revenue), align: "right" }]),
+    });
+  }
+
   const starred = (products || []).filter((p) => p.isBestseller && p.active !== false);
   if (starred.length) {
-    rep.heading(`Starred products (${starred.length})`);
+    rep.heading(`Monitored products (${starred.length})`);
+    rep.text("Products starred in Inventory because they sell out quickly, with their current stock.");
     rep.table({
       columns: [{ header: "Product", w: 7 }, { header: "Category", w: 3 }, { header: "Stock", w: 2.5, align: "right" }, { header: "Sold this day", w: 2, align: "right" }],
       rows: starred.sort((a, b) => (b.stock || 0) - (a.stock || 0)).map((p) => {
