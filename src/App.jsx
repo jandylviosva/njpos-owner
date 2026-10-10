@@ -1421,9 +1421,20 @@ function LoyaltyTab({data,primary}){
   );
 }
 
+// Categories are free text: "air filter", "Air Filter" and "AIR FILTER " are the same category, and a product can use one
+// that is not in the saved list. Match ignoring case/spacing and list the saved ones plus any a product uses.
+const catKey=(s)=>String(s??"").trim().replace(/\s+/g," ").toLowerCase();
+const sameCat=(a,b)=>catKey(a)===catKey(b);
+function mergeCategories(saved,products){
+  const seen=new Set(),out=[];
+  const add=(c)=>{const n=String(c??"").trim(),k=catKey(n);if(!k||seen.has(k))return;seen.add(k);out.push(n);};
+  (saved||[]).forEach(add);(products||[]).forEach(p=>add(p.category));
+  return out;
+}
+
 function Inventory({store,data,session,primary}){
   const products=data?.products||[];
-  const categories=data?.categories||[];
+  const categories=mergeCategories(data?.categories,products);
   const logs=data?.logs||[];
   const [tab,setTab]=useState("products");
   const [search,setSearch]=useState("");
@@ -1431,7 +1442,7 @@ function Inventory({store,data,session,primary}){
   const [expanded,setExpanded]=useState({});
   const toggleExpand=(id)=>setExpanded(e=>({...e,[id]:!e[id]}));
   const filtered=products.filter(p=>
-    (catFilter==="All"||p.category===catFilter)&&
+    (catFilter==="All"||sameCat(p.category,catFilter))&&
     (p.name.toLowerCase().includes(search.toLowerCase())||p.sku?.includes(search))
   );
   const fmt=(n)=>`₱${Number(n||0).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
