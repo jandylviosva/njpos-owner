@@ -8,6 +8,7 @@
 import { reportRecipients } from "./_reportEmails.js";
 import { buildDailyReportPdf, dailyReportPdfName } from "./_dailyReportPdf.js";
 import { discountSummary, discountLines } from "./_discounts.js";
+import { topSellers } from "./_bestsellers.js";
 
 const SUPA_URL         = process.env.SUPA_URL         || process.env.VITE_SUPA_URL;
 const SUPA_SERVICE_KEY = process.env.SUPA_SERVICE_KEY;
@@ -186,7 +187,15 @@ function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses,
     </tr>`;
   }).join('');
 
-  // Starred / bestseller products with current stock
+  // Bestsellers: top sold products of the report day (only products that sold)
+  const bestsellerList = topSellers(paid, 5);
+  const bestsellerRows = bestsellerList.map((b, i) => `<tr>
+      <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;color:#374151"><b style="color:${i===0?"#d97706":"#9ca3af"}">${i+1}.</b> ${b.name}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:700;color:#059669">${Number.isInteger(b.qty) ? b.qty : b.qty.toFixed(2)} sold</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;color:#6b7280">₱${b.revenue.toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+    </tr>`).join("");
+
+  // Monitored products (starred in Inventory because they sell out quickly) with current stock
   const starredProducts = (products||[])
     .filter(p => p.isBestseller && p.active !== false)
     .sort((a,b) => (b.stock||0) - (a.stock||0));
@@ -306,9 +315,23 @@ function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses,
         ✅ All products are well-stocked
       </div>`}
 
+      ${bestsellerRows ? `
+      <h3 style="font-size:13px;color:#374151;margin:0 0 8px">🏆 Bestsellers</h3>
+      <p style="font-size:11px;color:#9ca3af;margin:0 0 8px">The products that sold the most in this report</p>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #f3f4f6">
+        <thead>
+          <tr style="background:#f0fdf4">
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:700">Product</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:700">Sold</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:700">Sales</th>
+          </tr>
+        </thead>
+        <tbody>${bestsellerRows}</tbody>
+      </table>` : ""}
+
       ${starredRows ? `
-      <h3 style="font-size:13px;color:#374151;margin:0 0 8px">⭐ Starred Products</h3>
-      <p style="font-size:11px;color:#9ca3af;margin:0 0 8px">Your marked bestseller products and their current stock</p>
+      <h3 style="font-size:13px;color:#374151;margin:0 0 8px">⭐ Monitored Products</h3>
+      <p style="font-size:11px;color:#9ca3af;margin:0 0 8px">Products you monitor because they sell out quickly, with their current stock</p>
       <table style="width:100%;border-collapse:collapse;margin-bottom:20px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #f3f4f6">
         <thead>
           <tr style="background:#fffbeb">

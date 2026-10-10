@@ -607,7 +607,8 @@ function Dashboard({store,data,primary,licenseRow}){
   const [ordersShown,setOrdersShown] = useState(20);
   const [stockShown,setStockShown] = useState(20);
   const [shiftsShown,setShiftsShown] = useState(20);
-  const [bestsellersShown,setBestsellersShown] = useState(20);
+  const [bestsellersShown,setBestsellersShown] = useState(20);   // the Monitored list
+  const [bsPeriod,setBsPeriod] = useState("week");
   const [invShown,setInvShown] = useState(10);
   const [poShown,setPoShown] = useState(10);
   const orders=(data?.orders||[]).filter(o=>o.status==="paid"&&!o.invoiceId);
@@ -632,7 +633,22 @@ function Dashboard({store,data,primary,licenseRow}){
   const lowStock=products.filter(p=>p.active&&isLowStockPortal(p,computeStockPortal(p,products)));
   const outOfStock=products.filter(p=>p.active&&computeStockPortal(p,products)<=0);
   const stockAlerts=[...outOfStock.map(p=>({...p,_out:true})), ...lowStock.map(p=>({...p,_out:false}))];
-  const bestsellers=products.filter(p=>p.active&&p.isBestseller);
+  const bestsellers=products.filter(p=>p.active&&p.isBestseller);   // starred in Inventory = "Monitored"
+  // Bestsellers: the products that sold the most in the chosen period, from the sales (only products with sales)
+  const topSold=(()=>{
+    const from=bsPeriod==="today"?todayKey():bsPeriod==="month"?monthStart():weekStart();
+    const by=new Map();
+    for(const o of orders){
+      if(o.status!=="paid"||!o.dateKey||o.dateKey<from) continue;
+      for(const it of o.items||[]){
+        const id=it.productId||it.id, qty=Number(it.qty)||0;
+        if(!id||qty<=0) continue;
+        const cur=by.get(id)||{id,name:it.name||"Item",qty:0,revenue:0};
+        cur.qty+=qty; cur.revenue+=(Number(it.price)||0)*qty; by.set(id,cur);
+      }
+    }
+    return [...by.values()].sort((a,b)=>b.qty-a.qty||b.revenue-a.revenue||a.name.localeCompare(b.name)).slice(0,8);
+  })();
   const pendingInvoices=invoices.filter(i=>i.status==="pending"||i.status==="partially_delivered");
   const pendingPOs=purchaseOrders.filter(po=>po.status==="draft"||po.status==="ordered");
   const CARDS=[
@@ -756,10 +772,34 @@ function Dashboard({store,data,primary,licenseRow}){
           {stockAlerts.length>stockShown&&<div onClick={()=>setStockShown(n=>n+20)} style={{fontSize:12,color:primary,fontWeight:700,marginTop:4,textAlign:"center",cursor:"pointer"}}>Show more ({stockAlerts.length-stockShown} left)</div>}
         </Card>
 
-        {/* Bestsellers */}
+        {/* Bestsellers: top sold products, from the sales */}
+        <Card>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap",marginBottom:8}}>
+            <SectionTitle><span style={{color:"#16a34a",marginRight:6}}>▲</span>Bestsellers</SectionTitle>
+            <div style={{display:"flex",gap:4}}>
+              {[["today","Today"],["week","Week"],["month","Month"]].map(([k,l])=>(
+                <button key={k} onClick={()=>setBsPeriod(k)} style={{padding:"2px 9px",borderRadius:12,border:"1px solid",fontSize:11,fontWeight:700,cursor:"pointer",borderColor:bsPeriod===k?primary:"#e5e7eb",background:bsPeriod===k?primary:"#fff",color:bsPeriod===k?"#fff":"#6b7280"}}>{l}</button>
+              ))}
+            </div>
+          </div>
+          {topSold.length===0
+            ? <div style={{fontSize:13,color:"#9ca3af",textAlign:"center",padding:"12px 0"}}>No sales yet {bsPeriod==="today"?"today":bsPeriod==="week"?"this week":"this month"}.</div>
+            : topSold.map((p,i)=>(
+              <div key={p.id} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",background:"#f0fdf4",borderRadius:8,marginBottom:6}}>
+                <span style={{width:20,height:20,borderRadius:"50%",background:i===0?"#f59e0b":"#d1fae5",color:i===0?"#fff":"#065f46",fontSize:11,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{i+1}</span>
+                <span style={{fontSize:13,fontWeight:600,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</span>
+                <span style={{textAlign:"right",flexShrink:0}}>
+                  <span style={{display:"block",fontSize:12,fontWeight:800,color:"#065f46"}}>{Number.isInteger(p.qty)?p.qty:p.qty.toFixed(2)} sold</span>
+                  <span style={{display:"block",fontSize:10,color:"#6b7280"}}>{fmt(p.revenue)}</span>
+                </span>
+              </div>
+            ))}
+        </Card>
+
+        {/* Monitored: products starred in Inventory because they sell out quickly */}
         {bestsellers.length>0&&(
           <Card>
-            <SectionTitle><span style={{color:"#f59e0b",marginRight:6}}>★</span>Bestsellers ({bestsellers.length})</SectionTitle>
+            <SectionTitle><span style={{color:"#f59e0b",marginRight:6}}>★</span>Monitored ({bestsellers.length})</SectionTitle>
             {bestsellers.slice(0,bestsellersShown).map(p=>{
               const stock=computeStockPortal(p,products);
               const out=stock<=0;
@@ -1562,7 +1602,7 @@ function Inventory({store,data,session,primary}){
                         </div>
                       </td>
                       <td style={{padding:"8px",textAlign:"center"}}>
-                        <span title={p.isBestseller?"Bestseller":"Not a bestseller"} style={{fontSize:18,color:p.isBestseller?"#f59e0b":"#e5e7eb"}}>★</span>
+                        <span title={p.isBestseller?"Monitored (sells out quickly)":"Not monitored"} style={{fontSize:18,color:p.isBestseller?"#f59e0b":"#e5e7eb"}}>★</span>
                       </td>
                       <td style={{padding:"10px 12px",color:"#6b7280"}}>{p.category}</td>
                       <td style={{padding:"10px 12px",fontWeight:700,color:P}}>{priceCell}</td>
