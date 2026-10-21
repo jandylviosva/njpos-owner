@@ -394,10 +394,27 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Failed to fetch store_data" });
   }
 
+  // Stores whose license the developer has suspended (e.g. for non-payment) get no report. If the lookup fails the
+  // reports still go out, so a database hiccup never silences every store.
+  const suspendedStoreIds = new Set();
+  try {
+    const lics = await supaGet("licenses?status=eq.suspended&select=id");
+    const ids = (lics || []).map(l => l.id).filter(Boolean);
+    if (ids.length) {
+      const sts = await supaGet(`stores?license_id=in.(${ids.map(encodeURIComponent).join(",")})&select=id`);
+      (sts || []).forEach(st => suspendedStoreIds.add(st.id));
+    }
+  } catch (e) {
+    console.error("[daily-report] suspended-store lookup failed:", e?.message || e);
+  }
+
   const results = { sent: 0, skipped: 0, errors: 0 };
 
   for (const row of rows) {
     const os = row.order_settings || {};
+
+    // Suspended stores don't get reports
+    if (suspendedStoreIds.has(row.store_id)) { results.skipped++; continue; }
 
     // Skip stores that haven't opted in
     if (!os.reportEnabled)              { results.skipped++; continue; }
