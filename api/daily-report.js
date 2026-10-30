@@ -29,6 +29,14 @@ function phtDateKey(d) {
   return `${y}-${m}-${dy}`;
 }
 
+// The email is a summary: long lists stop after a few rows and point to the attached PDF, which has everything.
+const EMAIL_LIST_MAX = 10;
+const PDF_SEE    = "You can see the full list in the attached PDF file";
+const NO_PDF_SEE = "The full list is in the Reports tab of the POS app";
+const moreRow = (extra, cols, bg) => extra > 0
+  ? `<tr><td colspan="${cols}" style="padding:8px 12px;font-size:11px;color:#6b7280;text-align:center;background:${bg || "#f9fafb"}">+ ${extra} more · ${PDF_SEE}</td></tr>`
+  : "";
+
 function fmtPeso(n) {
   return "₱" + (Number(n) || 0).toLocaleString("en-PH", {
     minimumFractionDigits: 2,
@@ -94,18 +102,19 @@ async function sendEmail(to, subject, html, attachments) {
       ...payload,
     }),
   });
-  let r = await post(attachments?.length ? { html, attachments } : { html: html.replace(PDF_NOTE, "") });
+  const noPdf = (h) => h.replace(PDF_NOTE, "").split(PDF_SEE).join(NO_PDF_SEE);
+  let r = await post(attachments?.length ? { html, attachments } : { html: noPdf(html) });
   if (!r.ok && attachments?.length) {
     // the PDF is a bonus: if Resend refuses it, still deliver the summary email
     console.error("[daily-report] send with PDF failed, retrying without it:", await r.clone().text().catch(() => ""));
-    r = await post({ html: html.replace(PDF_NOTE, "") });
+    r = await post({ html: noPdf(html) });
   }
   return r.ok;
 }
 
 const PDF_NOTE = `<div style="background:#f5f3ff;border-radius:8px;padding:10px 14px;margin:0 0 20px;font-size:12px;color:#5b21b6">📎 <b>The full details are in the attached PDF</b>: every order, every product sold and every expense.</div>`;
 
-function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses, reportKey, payMethods) {
+export function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses, reportKey, payMethods) {
   const paid = orders.filter(o => o.status === "paid");
   const totalSales = paid.reduce((s, o) => s + (o.total || 0), 0);
   const orderCount = paid.length;
@@ -122,6 +131,15 @@ function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses,
     .reduce((s, e) => s + (parseFloat(e.amount)||0), 0);
 
   const totalExpenses = shiftExpenses + storeLevelExpenses;
+
+  // The biggest expenses first; the rest are in the PDF
+  const expenseList = [
+    ...paid.flatMap(o => (o.expenses||[]).map(e => ({ name: e.name||e.description||"Expense", amount: parseFloat(e.amount)||0, tag: "" }))),
+    ...(storeExpenses||[]).filter(e => e.date === reportKey).map(e => ({ name: e.description||"Expense", amount: parseFloat(e.amount)||0, tag: e.category||"" })),
+  ].filter(e => e.amount > 0).sort((a, b) => b.amount - a.amount);
+  const expenseRows = expenseList.slice(0, EMAIL_LIST_MAX).map(e =>
+    `<tr><td style="padding:6px 12px;border-bottom:1px solid #f9fafb;color:#6b7280;font-size:12px">${e.name}${e.tag ? ` <span style="color:#9ca3af">(${e.tag})</span>` : ""}</td><td style="padding:6px 12px;border-bottom:1px solid #f9fafb;text-align:right;font-weight:700;color:#991b1b;font-size:12px">${fmtPeso(e.amount)}</td></tr>`
+  ).join("") + moreRow(expenseList.length - EMAIL_LIST_MAX, 2, "#fef2f2");
 
   // Payment method breakdown
   const byMethod = {};
@@ -152,21 +170,6 @@ function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses,
       </tr>`;
     }).join("");
 
-  // Top 5 products by qty
-  const productQty = {};
-  paid.forEach(o => (o.items || []).forEach(it => {
-    productQty[it.name] = (productQty[it.name] || 0) + (it.qty || 1);
-  }));
-  const topProducts = Object.entries(productQty)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
-  const productRows = topProducts.map(([name, qty]) =>
-    `<tr>
-      <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;color:#374151">${name}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;font-weight:700;text-align:right">${qty}</td>
-    </tr>`
-  ).join("");
-
   // Stock alerts — out of stock or at/below lowStockAt threshold
   const stockAlerts = (products||[])
     .filter(p => p.active !== false && p.stockMode !== "none")
@@ -177,7 +180,7 @@ function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses,
     })
     .sort((a,b) => Number(a.stock||0) - Number(b.stock||0));
 
-  const stockAlertRows = stockAlerts.map(p => {
+  const stockAlertRowsShown = stockAlerts.slice(0, EMAIL_LIST_MAX).map(p => {
     const stock = Number(p.stock||0);
     const isOut = stock <= 0;
     return `<tr>
@@ -186,6 +189,8 @@ function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses,
       <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:700;color:${isOut?'#dc2626':'#d97706'}">${isOut?'Out of stock':`${stock} ${p.stockUnit||'pcs'} left`}</td>
     </tr>`;
   }).join('');
+
+  const stockAlertRows = stockAlertRowsShown + moreRow(stockAlerts.length - EMAIL_LIST_MAX, 3, "#fef2f2");
 
   // Bestsellers: top sold products of the report day (only products that sold)
   const bestsellerList = topSellers(paid, 5);
@@ -198,7 +203,7 @@ function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses,
   // Monitored products (starred in Inventory because they sell out quickly) with current stock
   const starredProducts = (products||[])
     .filter(p => p.isBestseller && p.active !== false)
-    .sort((a,b) => (b.stock||0) - (a.stock||0));
+    .sort((a,b) => (a.stock||0) - (b.stock||0));
 
   // Build a qty-sold-today map from today's orders
   const soldTodayMap = {};
@@ -206,7 +211,7 @@ function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses,
     soldTodayMap[it.name] = (soldTodayMap[it.name]||0) + (it.qty||1);
   }));
 
-  const starredRows = starredProducts.map(p => {
+  const starredRowsShown = starredProducts.slice(0, EMAIL_LIST_MAX).map(p => {
     const stock = Number(p.stock||0);
     const isOut = stock <= 0;
     const soldToday = soldTodayMap[p.name] || 0;
@@ -217,6 +222,7 @@ function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses,
       <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:700;color:${soldToday>0?'#2563EB':'#9ca3af'}">${soldToday > 0 ? soldToday+' sold' : '—'}</td>
     </tr>`;
   }).join('');
+  const starredRows = starredRowsShown + moreRow(starredProducts.length - EMAIL_LIST_MAX, 4, "#fffbeb");
 
   return `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px">
@@ -255,13 +261,8 @@ function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses,
       </div>
 
       ${disc.total > 0 ? `
-      <h3 style="font-size:13px;color:#374151;margin:0 0 8px">Discounts Given</h3>
-      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #f3f4f6">
-        <tr><td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;color:#374151;font-weight:700">Sales before discounts</td><td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:700">${fmtPeso(disc.gross)}</td></tr>
-        ${discountLines(disc).map(([l, v, n, col]) => `<tr><td style="padding:6px 12px 6px 20px;border-bottom:1px solid #f9fafb;color:${col}">${l} <span style="color:#9ca3af;font-size:11px">· ${n} order${n === 1 ? "" : "s"}</span></td><td style="padding:6px 12px;border-bottom:1px solid #f9fafb;text-align:right;color:${col};font-weight:700">-${fmtPeso(v)}</td></tr>`).join("")}
-        <tr style="background:#fef2f2"><td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;color:#991b1b;font-weight:800">Total discounts <span style="font-weight:400;font-size:11px">· ${disc.orders} of ${disc.orderCount} orders</span></td><td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;color:#991b1b;font-weight:800">-${fmtPeso(disc.total)}</td></tr>
-        ${disc.vatAdded > 0.005 ? `<tr><td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;color:#6b7280">Add: VAT</td><td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;text-align:right">${fmtPeso(disc.vatAdded)}</td></tr>` : ""}
-        <tr><td style="padding:8px 12px;font-weight:800">Total Sales</td><td style="padding:8px 12px;text-align:right;font-weight:800">${fmtPeso(disc.sales)}</td></tr>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;background:#fef2f2;border-radius:8px;overflow:hidden;border:1px solid #fecaca">
+        <tr><td style="padding:10px 12px;color:#991b1b;font-weight:800;font-size:13px">Discounts given <span style="font-weight:400;font-size:11px;color:#6b7280">· ${disc.orders} of ${disc.orderCount} orders · sales before discounts ${fmtPeso(disc.gross)}</span></td><td style="padding:10px 12px;text-align:right;color:#991b1b;font-weight:800;font-size:13px">-${fmtPeso(disc.total)}</td></tr>
       </table>` : ""}
 
       ${methodRows ? `
@@ -273,34 +274,16 @@ function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses,
       ${(totalExpenses > 0) ? `
       <h3 style="font-size:13px;color:#374151;margin:0 0 8px">Expenses</h3>
       <table style="width:100%;border-collapse:collapse;margin-bottom:20px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #fecaca">
-        ${shiftExpenses > 0 ? `<tr style="background:#fffbeb"><td colspan="2" style="padding:6px 12px;font-size:11px;font-weight:700;color:#d97706">Shift Expenses</td></tr>
-        ${paid.reduce((rows, o) => {
-          (o.expenses||[]).forEach(e => { rows += `<tr><td style="padding:6px 12px 6px 20px;border-bottom:1px solid #f9fafb;color:#6b7280;font-size:12px">${e.name||e.description||"Expense"}</td><td style="padding:6px 12px;border-bottom:1px solid #f9fafb;text-align:right;font-weight:700;color:#991b1b;font-size:12px">${fmtPeso(parseFloat(e.amount)||0)}</td></tr>`; });
-          return rows;
-        }, "")}` : ""}
-        ${storeLevelExpenses > 0 ? `<tr style="background:#faf5ff"><td colspan="2" style="padding:6px 12px;font-size:11px;font-weight:700;color:#7c3aed">Store Expenses</td></tr>
-        ${(storeExpenses||[]).filter(e=>e.date===reportKey).sort((a,b)=>b.date.localeCompare(a.date)).map(e=>`<tr><td style="padding:6px 12px 6px 20px;border-bottom:1px solid #f9fafb;color:#6b7280;font-size:12px">${e.description} <span style="color:#9ca3af">(${e.category||""})</span></td><td style="padding:6px 12px;border-bottom:1px solid #f9fafb;text-align:right;font-weight:700;color:#991b1b;font-size:12px">${fmtPeso(parseFloat(e.amount)||0)}</td></tr>`).join("")}` : ""}
+        ${expenseRows}
         <tr style="background:#fef2f2"><td style="padding:8px 12px;font-weight:800;font-size:13px">Total Expenses</td><td style="padding:8px 12px;text-align:right;font-weight:800;color:#dc2626;font-size:13px">${fmtPeso(totalExpenses)}</td></tr>
       </table>` : `
       <div style="background:#f0fdf4;border-radius:8px;padding:12px;margin-bottom:20px;text-align:center;color:#059669;font-size:13px;font-weight:700">
         ✅ No expenses recorded today
       </div>`}
 
-      ${productRows ? `
-      <h3 style="font-size:13px;color:#374151;margin:0 0 8px">Top Products</h3>
-      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #f3f4f6">
-        <thead>
-          <tr style="background:#f9fafb">
-            <th style="padding:8px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:700">Product</th>
-            <th style="padding:8px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:700">Qty Sold</th>
-          </tr>
-        </thead>
-        <tbody>${productRows}</tbody>
-      </table>` : ""}
-
       ${stockAlertRows ? `
-      <h3 style="font-size:13px;color:#dc2626;margin:0 0 8px">⚠️ Stock Alerts</h3>
-      <p style="font-size:11px;color:#9ca3af;margin:0 0 8px">Products at or below low stock threshold</p>
+      <h3 style="font-size:13px;color:#dc2626;margin:0 0 8px">⚠️ Stock Alerts (${stockAlerts.length})</h3>
+      <p style="font-size:11px;color:#9ca3af;margin:0 0 8px">Products at or below low stock threshold, lowest stock first</p>
       <table style="width:100%;border-collapse:collapse;margin-bottom:20px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #fecaca">
         <thead>
           <tr style="background:#fef2f2">
@@ -330,8 +313,8 @@ function buildReportHtml(storeName, todayLabel, orders, products, storeExpenses,
       </table>` : ""}
 
       ${starredRows ? `
-      <h3 style="font-size:13px;color:#374151;margin:0 0 8px">⭐ Monitored Products</h3>
-      <p style="font-size:11px;color:#9ca3af;margin:0 0 8px">Products you monitor because they sell out quickly, with their current stock</p>
+      <h3 style="font-size:13px;color:#374151;margin:0 0 8px">⭐ Monitored Products (${starredProducts.length})</h3>
+      <p style="font-size:11px;color:#9ca3af;margin:0 0 8px">Products you monitor because they sell out quickly, lowest stock first</p>
       <table style="width:100%;border-collapse:collapse;margin-bottom:20px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #f3f4f6">
         <thead>
           <tr style="background:#fffbeb">
