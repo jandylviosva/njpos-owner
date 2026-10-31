@@ -42,12 +42,10 @@ export const reportDays = (os) => {
   return [0, 1, 2, 3, 4, 5, 6];
 };
 
-// What the report covers: "yesterday" (the day before the send day) or "today" (the send day so far). When the store
-// hasn't chosen, a report sent before noon covers the day that just ended and one sent from noon on covers today so far.
-export const coverage = (day, schedMin, covers) => {
-  const c = covers === "today" || covers === "yesterday" ? covers : (schedMin < 12 * 60 ? "yesterday" : "today");
-  return c === "yesterday" ? { reportKey: addDays(day, -1), todaySoFar: false } : { reportKey: day, todaySoFar: true };
-};
+// What the report covers: today's sales from the start of the day up to the send time. At exactly 12:00 AM today has only
+// just begun, so that report covers the whole day that just ended.
+export const coverage = (day, schedMin) =>
+  schedMin === 0 ? { reportKey: addDays(day, -1), todaySoFar: false } : { reportKey: day, todaySoFar: true };
 
 // { due:false, reason } or { due:true, key, day, tz, schedMin, reportKey, todaySoFar }
 export const dueNow = (os, nowMs = Date.now()) => {
@@ -63,7 +61,7 @@ export const dueNow = (os, nowMs = Date.now()) => {
   if (os?.lastReportSentKey === key) return { due: false, reason: "already sent" };
   // reports sent before this setting existed only recorded the date, and always at midnight
   if (normTime(os?.reportTime) === "00:00" && os?.lastReportSentDate === day) return { due: false, reason: "already sent" };
-  return { due: true, key, day, tz, schedMin, ...coverage(day, schedMin, os?.reportCovers) };
+  return { due: true, key, day, tz, schedMin, ...coverage(day, schedMin) };
 };
 
 // 540 -> "9:00 AM"
