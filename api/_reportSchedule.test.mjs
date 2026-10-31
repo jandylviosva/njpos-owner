@@ -50,6 +50,14 @@ test("morning time covers the day before", () => {
   const d = dueNow({ reportTime: "09:00" }, pht("2026-10-31T09:25:00"));
   assert.equal(d.due, true); assert.equal(d.reportKey, "2026-10-30"); assert.equal(d.todaySoFar, false);
 });
+test("the store can choose what the report covers, whatever the time", () => {
+  const morningToday = dueNow({ reportTime: "10:30", reportCovers: "today" }, pht("2026-10-31T10:40:00"));
+  assert.equal(morningToday.due, true); assert.equal(morningToday.reportKey, "2026-10-31"); assert.equal(morningToday.todaySoFar, true);
+  const eveningYesterday = dueNow({ reportTime: "21:00", reportCovers: "yesterday" }, pht("2026-10-31T21:10:00"));
+  assert.equal(eveningYesterday.reportKey, "2026-10-30"); assert.equal(eveningYesterday.todaySoFar, false);
+  // not chosen -> the old noon rule
+  assert.equal(dueNow({ reportTime: "10:30" }, pht("2026-10-31T10:40:00")).reportKey, "2026-10-30");
+});
 test("days of the week: custom Mon/Wed/Fri", () => {
   const os = { reportTime: "21:00", reportDays: "custom", reportDaysList: [1, 3, 5] };
   assert.equal(dueNow(os, pht("2026-10-30T21:05:00")).due, true);   // Friday
