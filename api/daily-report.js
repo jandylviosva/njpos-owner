@@ -1,33 +1,22 @@
 // Vercel Cron Function — /api/daily-report
 //
-// Runs at 16:00 UTC daily (= midnight Philippine Time, UTC+8).
-// For each active store with reportEnabled, sends a daily sales summary
-// covering "today so far" in PHT (orders from midnight PHT up to send time).
+// Runs on a schedule (see "crons" in vercel.json): once a day at midnight Philippine Time on a plan that only allows
+// one run a day, or every 30 minutes when the plan allows it.
+// Each store picks its own time of day (default 12:00 AM) and days of the week (order_settings.reportTime /
+// reportDays); every run sends the reports that are due since the last run (see _reportSchedule.js), so a late run
+// still sends and nothing goes out twice. A report sent before noon covers the day that just ended; one sent from noon
+// on covers today so far.
 // Uses the Supabase SERVICE key — never the anon key.
 
 import { reportRecipients } from "./_reportEmails.js";
 import { buildDailyReportPdf, dailyReportPdfName } from "./_dailyReportPdf.js";
 import { discountSummary, discountLines } from "./_discounts.js";
 import { topSellers } from "./_bestsellers.js";
+import { dueNow, fmtClock } from "./_reportSchedule.js";
 
 const SUPA_URL         = process.env.SUPA_URL         || process.env.VITE_SUPA_URL;
 const SUPA_SERVICE_KEY = process.env.SUPA_SERVICE_KEY;
 const RESEND_KEY       = process.env.RESEND_KEY;
-
-// PHT = UTC + 8 hours
-const PHT_OFFSET_MS = 8 * 60 * 60 * 1000;
-
-function phtNow() {
-  return new Date(Date.now() + PHT_OFFSET_MS);
-}
-
-// "YYYY-MM-DD" in PHT
-function phtDateKey(d) {
-  const y  = d.getUTCFullYear();
-  const m  = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const dy = String(d.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${dy}`;
-}
 
 // The email is a summary: long lists stop after a few rows and point to the attached PDF, which has everything.
 const EMAIL_LIST_MAX = 10;
@@ -334,6 +323,19 @@ export function buildReportHtml(storeName, todayLabel, orders, products, storeEx
     </div>`;
 }
 
+// Remember that this occurrence was handled. order_settings is read again right before writing, so a setting the store
+// saved a moment ago is not overwritten by the copy this run started with.
+async function markSent(storeId, due) {
+  try {
+    const fresh = await supaGet(`store_data?store_id=eq.${encodeURIComponent(storeId)}&select=order_settings`);
+    const current = Array.isArray(fresh) && fresh[0] ? (fresh[0].order_settings || {}) : null;
+    if (!current) return;
+    await supaUpdateOrderSettings(storeId, { ...current, lastReportSentKey: due.key, lastReportSentDate: due.day });
+  } catch (e) {
+    console.error(`[daily-report] could not record the send for store ${storeId}:`, e?.message || e);
+  }
+}
+
 export default async function handler(req, res) {
   // Only Vercel's cron may run this (it used to run for any GET or POST, so anyone who found the URL
   // could trigger the reports). With CRON_SECRET set in Vercel the call must carry it (Vercel adds the
@@ -355,24 +357,12 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Resend not configured" });
   }
 
-  const pht        = phtNow();
-  const todayKey   = phtDateKey(pht);
-  // The cron fires at midnight PHT — "today" has just started and has no orders yet.
-  // The report should cover yesterday (the day that just ended).
-  const yesterday  = new Date(pht.getTime() - 24*60*60*1000);
-  const reportKey  = phtDateKey(yesterday);
-  const todayLabel = yesterday.toLocaleDateString("en-PH", {
-    timeZone: "UTC",
-    month: "long", day: "numeric", year: "numeric",
-  });
+  const nowMs = Date.now();
+  console.log(`[daily-report] Run at ${new Date(nowMs).toISOString()}`);
 
-  console.log(`[daily-report] Cron fired. Reporting on: ${reportKey}`);
-
-  // Fetch all store_data rows that have order_settings + orders.
-  // We select only what we need to keep the payload small.
-  const rows = await supaGet(
-    "store_data?select=store_id,order_settings,orders,products,theme"
-  );
+  // Only the small order_settings column of every store here (who is due is decided from it); the big columns
+  // (orders, products) are read below for the stores that are actually due.
+  const rows = await supaGet("store_data?select=store_id,order_settings");
   if (!rows) {
     return res.status(500).json({ error: "Failed to fetch store_data" });
   }
@@ -404,17 +394,33 @@ export default async function handler(req, res) {
     const recipients = reportRecipients(os.reportEmail);
     if (!recipients.length)             { results.skipped++; continue; }
 
-    // Already sent today's report?
-    if (os.lastReportSentDate === todayKey) { results.skipped++; continue; }
+    // Is this store's report due now (its time of day, its days of the week, not already sent)?
+    const due = dueNow(os, nowMs);
+    if (!due.due)                       { results.skipped++; continue; }
 
-    const storeName = row.theme?.storeName || "My Store";
-    const allOrders = row.orders || [];
+    const reportKey  = due.reportKey;
+    const todayLabel = new Date(reportKey + "T00:00:00Z").toLocaleDateString("en-PH", { timeZone: "UTC", month: "long", day: "numeric", year: "numeric" })
+      + (due.todaySoFar ? ` (until ${fmtClock(due.schedMin)})` : "");
 
-    // Filter to yesterday's orders (the day the report covers)
+    const data = await supaGet(`store_data?store_id=eq.${encodeURIComponent(row.store_id)}&select=orders,products,theme`);
+    const full = Array.isArray(data) ? data[0] : null;
+    if (!full) { results.errors++; console.error(`[daily-report] could not read store ${row.store_id}`); continue; }
+
+    const storeName = full.theme?.storeName || "My Store";
+    const allOrders = full.orders || [];
+
+    // Filter to the orders of the day the report covers
     const todayOrders = allOrders.filter(o => o.dateKey === reportKey);
 
-    const allProducts = row.products || [];
-    const allStoreExpenses = row.store_expenses || os.storeExpenses || [];
+    // "Don't send on days with no sales": remember it as handled so the next run doesn't look again
+    if (os.reportSkipEmpty && !todayOrders.some(o => o.status === "paid")) {
+      await markSent(row.store_id, due);
+      results.skipped++;
+      continue;
+    }
+
+    const allProducts = full.products || [];
+    const allStoreExpenses = os.storeExpenses || [];
     const payMethods = os.payMethods || [];
     const html = buildReportHtml(storeName, todayLabel, todayOrders, allProducts, allStoreExpenses, reportKey, payMethods);
     const subject = `Daily Sales Report — ${todayLabel} · ${storeName}`;
@@ -434,9 +440,7 @@ export default async function handler(req, res) {
     try {
       const ok = await sendEmail(recipients, subject, html, attachments);
       if (ok) {
-        // Write lastReportSentDate back so we don't double-send this hour
-        const updatedOs = { ...os, lastReportSentDate: todayKey };
-        await supaUpdateOrderSettings(row.store_id, updatedOs);
+        await markSent(row.store_id, due);
         results.sent++;
         console.log(`[daily-report] Sent to ${recipients.join(", ")} for store ${row.store_id}`);
       } else {
