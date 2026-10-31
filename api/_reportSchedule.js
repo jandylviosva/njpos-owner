@@ -1,11 +1,12 @@
 // When a store's scheduled daily report is due. The leading underscore keeps Vercel from exposing this file as a route.
 //
-// A store chooses a time of day (default 12:00 AM) and which days of the week; the time is in the store's time zone
+// A store chooses a time of day (default 11:59 PM, the end of the day) and which days of the week; the time is in the store's time zone
 // (order_settings.timezone, default Asia/Manila). The server job runs often (every 30 minutes, or once a day at midnight
 // Philippine Time on a plan that only allows one run a day) and sends the reports that have become due since the last
 // run, so a late run still sends and nothing is sent twice.
 export const DEFAULT_TZ = "Asia/Manila";
-export const MAX_LATE_MIN = 12 * 60;   // a run that finds a report more than this late skips it instead of sending something stale
+export const MAX_LATE_MIN = 3 * 60;    // a run that finds a report more than this late skips it instead of sending something stale
+export const END_OF_DAY = "23:59";     // the default send time: the end of the business day
 
 const pad = (n) => String(n).padStart(2, "0");
 
@@ -13,11 +14,13 @@ export const validTz = (tz) => {
   try { new Intl.DateTimeFormat("en-US", { timeZone: tz }); return tz; } catch { return DEFAULT_TZ; }
 };
 
-// "HH:MM" -> minutes since midnight (anything unreadable is midnight)
+// "HH:MM" -> minutes since midnight. A missing, unreadable or midnight ("00:00", the old default) time means the end of
+// the day, 11:59 PM, so a report at "midnight" is the report of the day that is ending.
 export const parseTime = (t) => {
-  const m = /^(\d{1,2}):(\d{2})$/.exec(String(t || "00:00").trim());
-  if (!m) return 0;
-  return Math.min(23, Number(m[1])) * 60 + Math.min(59, Number(m[2]));
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(t || "").trim());
+  if (!m) return 23 * 60 + 59;
+  const mins = Math.min(23, Number(m[1])) * 60 + Math.min(59, Number(m[2]));
+  return mins === 0 ? 23 * 60 + 59 : mins;
 };
 export const normTime = (t) => { const mins = parseTime(t); return `${pad(Math.floor(mins / 60))}:${pad(mins % 60)}`; };
 
@@ -42,10 +45,9 @@ export const reportDays = (os) => {
   return [0, 1, 2, 3, 4, 5, 6];
 };
 
-// What the report covers: today's sales from the start of the day up to the send time. At exactly 12:00 AM today has only
-// just begun, so that report covers the whole day that just ended.
-export const coverage = (day, schedMin) =>
-  schedMin === 0 ? { reportKey: addDays(day, -1), todaySoFar: false } : { reportKey: day, todaySoFar: true };
+// What the report covers: the sales of the send day up to the send time. At the end-of-day time (11:59 PM) that is the whole
+// day, so the label doesn't say "until".
+export const coverage = (day, schedMin) => ({ reportKey: day, todaySoFar: schedMin < 23 * 60 + 59 });
 
 // { due:false, reason } or { due:true, key, day, tz, schedMin, reportKey, todaySoFar }
 export const dueNow = (os, nowMs = Date.now()) => {
@@ -59,8 +61,8 @@ export const dueNow = (os, nowMs = Date.now()) => {
   if (!reportDays(os).includes(dayOfWeek(day))) return { due: false, reason: "not a report day" };
   const key = `${day}T${normTime(os?.reportTime)}`;
   if (os?.lastReportSentKey === key) return { due: false, reason: "already sent" };
-  // reports sent before this setting existed only recorded the date, and always at midnight
-  if (normTime(os?.reportTime) === "00:00" && os?.lastReportSentDate === day) return { due: false, reason: "already sent" };
+  // Reports sent when the default was midnight recorded the date of the run, which is the day AFTER the day they covered
+  if (normTime(os?.reportTime) === END_OF_DAY && os?.lastReportSentDate === addDays(day, 1)) return { due: false, reason: "already sent" };
   return { due: true, key, day, tz, schedMin, ...coverage(day, schedMin) };
 };
 
