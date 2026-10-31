@@ -1,7 +1,6 @@
 // Vercel Cron Function — /api/daily-report
 //
-// Runs on a schedule (see "crons" in vercel.json): once a day at midnight Philippine Time on a plan that only allows
-// one run a day, or every 30 minutes when the plan allows it.
+// Runs every 30 minutes (see "crons" in vercel.json; needs the Vercel Pro plan, the free plan only allows one run a day).
 // Each store picks its own time of day (default 12:00 AM) and days of the week (order_settings.reportTime /
 // reportDays); every run sends the reports that are due since the last run (see _reportSchedule.js), so a late run
 // still sends and nothing goes out twice. A report sent before noon covers the day that just ended; one sent from noon
