@@ -172,9 +172,7 @@ export async function buildDailyReportPdf({ storeName, dateLabel, reportKey, ord
       rows: sorted.map((o) => [
         timeOf(o), (o.id || "") + (o.notes ? `\n[Note: ${o.notes}]` : ""), o.cashier || "",
         [o.orderType, o.orderSource].filter(Boolean).join(" / ") || "-",
-        (o.payMethod === "split"
-          ? `${labelForMethod("cash", payMethods)} ${peso(o.splitCash)} + ${labelForMethod(o.splitOnlineMethod, payMethods)} ${peso(o.splitOnlineAmount)}`
-          : labelForMethod(o.payMethod, payMethods)) + (o.refNum ? ` #${o.refNum}` : ""),
+        labelForMethod(o.payMethod, payMethods) + (o.refNum ? ` #${o.refNum}` : ""),
         o.discountAmt ? peso(o.discountAmt) : "",
         { text: peso(o.total), bold: true, align: "right" },
       ]),
