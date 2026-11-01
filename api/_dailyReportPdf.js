@@ -1,6 +1,7 @@
 // Builds the detailed PDF that goes with the daily report email. The email is a summary (top 5
 // products, totals); this has the whole day: every order, every product sold, every expense.
 // The leading underscore keeps Vercel from exposing this file as a route.
+import { paymentTotalsByMethod } from "./_paymentBreakdown.js";
 import { PdfReport } from "./_pdfKit.js";
 import { discountSummary, discountLines } from "./_discounts.js";
 import { topSellers } from "./_bestsellers.js";
@@ -55,13 +56,8 @@ export async function buildDailyReportPdf({ storeName, dateLabel, reportKey, ord
   const storeLevelExpenses = storeExpenseRows.reduce((s, r) => s + r[3], 0);
   const totalExpenses = shiftExpenses + storeLevelExpenses;
 
-  const byMethod = {};
-  paid.forEach((o) => {
-    const m = o.payMethod || "cash";
-    byMethod[m] = byMethod[m] || { count: 0, amt: 0 };
-    byMethod[m].count += 1;
-    byMethod[m].amt += o.total || 0;
-  });
+  // a split order counts as its cash part + its online part (never as "Split")
+  const byMethod = paymentTotalsByMethod(paid);
   const cashCollected = byMethod.cash?.amt || 0;
   const cashOnHand = cashCollected - totalExpenses;
   const nonCash = Object.entries(byMethod).filter(([k]) => k !== "cash").reduce((s, [, v]) => s + v.amt, 0);
@@ -176,7 +172,9 @@ export async function buildDailyReportPdf({ storeName, dateLabel, reportKey, ord
       rows: sorted.map((o) => [
         timeOf(o), (o.id || "") + (o.notes ? `\n[Note: ${o.notes}]` : ""), o.cashier || "",
         [o.orderType, o.orderSource].filter(Boolean).join(" / ") || "-",
-        labelForMethod(o.payMethod, payMethods) + (o.refNum ? ` #${o.refNum}` : ""),
+        (o.payMethod === "split"
+          ? `${labelForMethod("cash", payMethods)} ${peso(o.splitCash)} + ${labelForMethod(o.splitOnlineMethod, payMethods)} ${peso(o.splitOnlineAmount)}`
+          : labelForMethod(o.payMethod, payMethods)) + (o.refNum ? ` #${o.refNum}` : ""),
         o.discountAmt ? peso(o.discountAmt) : "",
         { text: peso(o.total), bold: true, align: "right" },
       ]),

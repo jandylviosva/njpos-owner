@@ -8,6 +8,7 @@
 // Uses the Supabase SERVICE key — never the anon key.
 
 import { reportRecipients } from "./_reportEmails.js";
+import { paymentTotalsByMethod } from "./_paymentBreakdown.js";
 import { buildDailyReportPdf, dailyReportPdfName } from "./_dailyReportPdf.js";
 import { discountSummary, discountLines } from "./_discounts.js";
 import { topSellers } from "./_bestsellers.js";
@@ -130,11 +131,9 @@ export function buildReportHtml(storeName, todayLabel, orders, products, storeEx
   ).join("") + moreRow(expenseList.length - EMAIL_LIST_MAX, 2, "#fef2f2");
 
   // Payment method breakdown
+  // a split order counts as its cash part + its online part (never as "Split")
   const byMethod = {};
-  paid.forEach(o => {
-    const m = o.payMethod || "cash";
-    byMethod[m] = (byMethod[m] || 0) + (o.total || 0);
-  });
+  Object.entries(paymentTotalsByMethod(paid)).forEach(([m, v]) => { byMethod[m] = v.amt; });
 
   // Cash on Hand = cash collected minus expenses (expenses paid from cash drawer)
   const cashCollected = byMethod["cash"] || 0;
