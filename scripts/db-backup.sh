@@ -4,7 +4,9 @@
 set -euo pipefail
 : "${SUPABASE_DB_URL:?}" "${SUPABASE_URL:?}" "${SUPABASE_SERVICE_KEY:?}"
 BUCKET="${BACKUP_BUCKET:-db-backups}"; KEEP_DAYS="${KEEP_DAYS:-30}"; API="${SUPABASE_URL%/}/storage/v1"
-auth=(-H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" -H "apikey: ${SUPABASE_SERVICE_KEY}")
+# New-style keys (sb_secret_...) are not JWTs: they go in the apikey header only. Old service_role keys (JWTs) go in both.
+if [[ "$SUPABASE_SERVICE_KEY" == sb_* ]]; then auth=(-H "apikey: ${SUPABASE_SERVICE_KEY}")
+else auth=(-H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" -H "apikey: ${SUPABASE_SERVICE_KEY}"); fi
 
 stamp="$(date -u +%Y-%m-%d_%H%M)"
 file="njpos-db-${stamp}.dump"
