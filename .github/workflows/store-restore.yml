@@ -1,0 +1,41 @@
+name: Build a store restore script from a backup
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: "Store owner email (e.g. motorpartskkc@gmail.com)"
+        required: true
+      backup_file:
+        description: "Optional: a file name under db-backups/daily (leave empty for the newest)"
+        required: false
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL 17
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-17
+          sudo pg_lsclusters
+          sudo pg_ctlcluster 17 main start || true
+      - name: Build the restore script
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          STORE_EMAIL: ${{ github.event.inputs.email }}
+          BACKUP_FILE: ${{ github.event.inputs.backup_file }}
+          PGBIN: /usr/lib/postgresql/17/bin/
+        run: ./scripts/store-restore.sh
+      - name: Keep the script for one day
+        uses: actions/upload-artifact@v4
+        with:
+          name: restore-script
+          path: restore-script.sql
+          retention-days: 1

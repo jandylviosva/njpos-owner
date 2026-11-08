@@ -20,3 +20,12 @@ The schedule only runs from the default branch (`main`).
    (or use a free local Postgres / a throwaway Supabase project).
 3. In that restored copy run the same generator queries used before (users/roles/categories, settings): they print a script.
 4. Run the printed script in the live project.
+
+## One-click restore of one store (use this instead of the manual steps above)
+GitHub -> repository `njpos-owner` -> Actions -> **Build a store restore script from a backup** -> Run workflow:
+- *email*: the store owner's email (e.g. `motorpartskkc@gmail.com`)
+- *backup_file*: leave empty for the newest backup, or type a file name from Storage -> `db-backups` -> `daily` (pick an older one if the newest was taken after the damage)
+
+When the run is green, open it and download the **restore-script** artifact (it is deleted after one day). Run `restore-script.sql` in the live Supabase project.
+It puts back the store's users, roles, categories, branding (name, initials) and settings from the backup, keeps anything newer that the live store has, and never touches orders, products or shifts.
+It first saves the live row in a private table `store_data_restore_safety_<date>`.
