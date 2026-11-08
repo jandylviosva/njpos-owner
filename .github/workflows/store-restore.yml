@@ -23,8 +23,14 @@ jobs:
           echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update -qq
           sudo apt-get install -y -qq postgresql-17
+          # the runner may already have another PostgreSQL version, so version 17 can sit on another port: find it and start it
           sudo pg_lsclusters
+          PORT=$(pg_lsclusters -h | awk '$1==17 && $2=="main" {print $3}')
+          [ -n "$PORT" ] || { echo "no version 17 cluster was created"; exit 1; }
           sudo pg_ctlcluster 17 main start || true
+          for i in $(seq 1 20); do sudo -u postgres /usr/lib/postgresql/17/bin/pg_isready -p "$PORT" && break; sleep 1; done
+          sudo -u postgres /usr/lib/postgresql/17/bin/pg_isready -p "$PORT"
+          echo "PGPORT=$PORT" >> "$GITHUB_ENV"
       - name: Build the restore script
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
