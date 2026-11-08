@@ -18,9 +18,10 @@ curl -fsS "${auth[@]}" -o backup.dump "$API/object/${BUCKET}/daily/${BACKUP_FILE
 
 SU=${PGSUPER:-"sudo -u postgres"}; PORT="${PGPORT:-5432}"
 $SU "${PGBIN}dropdb" -p "$PORT" --if-exists restored_backup; $SU "${PGBIN}createdb" -p "$PORT" restored_backup
-$SU "${PGBIN}pg_restore" -p "$PORT" --no-owner --no-privileges -d restored_backup "$(pwd)/backup.dump" || echo "(pg_restore reported warnings, usually about database roles; continuing)"
+# the files are fed in through stdin: the database tools run as the postgres user, who cannot open files in this folder
+$SU "${PGBIN}pg_restore" -p "$PORT" --no-owner --no-privileges -d restored_backup < backup.dump || echo "(pg_restore reported warnings, usually about database roles; continuing)"
 $SU "${PGBIN}psql" -p "$PORT" -d restored_backup -Atc "select 'store_data rows in backup: ' || count(*) from store_data"
 safety="store_data_restore_safety_$(date -u +%Y%m%d_%H%M)"
-$SU "${PGBIN}psql" -p "$PORT" -d restored_backup -v ON_ERROR_STOP=1 -v email="$STORE_EMAIL" -v safety="$safety" -At -f "$here/store-restore-generator.sql" > "$OUT"
+$SU "${PGBIN}psql" -p "$PORT" -d restored_backup -v ON_ERROR_STOP=1 -v email="$STORE_EMAIL" -v safety="$safety" -At < "$here/store-restore-generator.sql" > "$OUT"
 [ -s "$OUT" ] || { echo "no store with that email in the backup"; exit 1; }
 echo "restore script written to $OUT ($(wc -c < "$OUT") bytes), safety copy table: $safety"
