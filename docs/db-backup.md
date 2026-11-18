@@ -29,3 +29,12 @@ GitHub -> repository `njpos-owner` -> Actions -> **Build a store restore script 
 When the run is green, open it and download the **restore-script** artifact (it is deleted after one day). Run `restore-script.sql` in the live Supabase project.
 It puts back the store's users, roles, categories, branding (name, initials) and settings from the backup, keeps anything newer that the live store has, and never touches orders, products or shifts.
 It first saves the live row in a private table `store_data_restore_safety_<date>`.
+
+## Restoring a store's PRODUCTS from a backup
+Use this when a store's products were deleted (the restore above never touches products). GitHub -> `njpos-owner` -> Actions -> **Restore a store's products from a backup** -> Run workflow:
+- *email*: the store owner's email
+- *backup_file*: a file from BEFORE the products were lost (Storage -> `db-backups` -> `daily`; names are in UTC)
+- *apply*: first run with **no** (a preview: it only prints a report), then **yes** to restore.
+
+The stock numbers come from the backup, reduced by what the paid orders sold since then (orders that are in the live store but not in the backup). The report lists units sold since, products created after the backup (not restored) and products that would go below zero (shown as 0). Anything received or edited after the backup needs a stock count.
+The products are written through the same database function the app uses (`upsert_products`), so every device picks them up on its next sync.

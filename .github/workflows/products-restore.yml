@@ -1,0 +1,54 @@
+name: Restore a store's products from a backup
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: "Store owner email (e.g. motorpartsnibosc@gmail.com)"
+        required: true
+      backup_file:
+        description: "Optional: a file name under db-backups/daily (empty = the newest). Pick one from BEFORE the products were lost."
+        required: false
+      apply:
+        description: "no = preview only (nothing is written). yes = restore the products into the live store."
+        required: true
+        default: "no"
+        type: choice
+        options: ["no", "yes"]
+permissions:
+  contents: read
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL 17
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-17
+          # the runner already has a (stopped) PostgreSQL 16 cluster, so installing 17 does not create one: make our own on port 5433
+          sudo pg_lsclusters
+          PORT=5433
+          sudo pg_lsclusters -h | awk '$1==17 && $2=="main"' | grep -q . || sudo pg_createcluster 17 main -p "$PORT"
+          PORT=$(sudo pg_lsclusters -h | awk '$1==17 && $2=="main" {print $3}')
+          sudo pg_ctlcluster 17 main start || true
+          for i in $(seq 1 30); do sudo -u postgres /usr/lib/postgresql/17/bin/pg_isready -p "$PORT" && break; sleep 1; done
+          sudo -u postgres /usr/lib/postgresql/17/bin/pg_isready -p "$PORT"
+          echo "PGPORT=$PORT" >> "$GITHUB_ENV"
+      - name: Rebuild the product list (preview, or restore when apply = yes)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          STORE_EMAIL: ${{ github.event.inputs.email }}
+          BACKUP_FILE: ${{ github.event.inputs.backup_file }}
+          APPLY: ${{ github.event.inputs.apply }}
+          PGBIN: /usr/lib/postgresql/17/bin/
+        run: ./scripts/products-restore.sh 2>&1 | tee products-restore.log
+      - name: Show the report in the run summary
+        if: always()
+        run: |
+          { echo '### Product restore'; echo '```'; sed -n '/===== REPORT =====/,$p' products-restore.log | head -40; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
