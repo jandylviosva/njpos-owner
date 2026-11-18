@@ -38,3 +38,9 @@ Use this when a store's products were deleted (the restore above never touches p
 
 The stock numbers come from the backup, reduced by what the paid orders sold since then (orders that are in the live store but not in the backup). The report lists units sold since, products created after the backup (not restored) and products that would go below zero (shown as 0). Anything received or edited after the backup needs a stock count.
 The products are written through the same database function the app uses (`upsert_products`), so every device picks them up on its next sync.
+
+## Early warning and protections (added after the KKC / Ni Bosc incidents)
+- **Hourly store health check** (`.github/workflows/store-health-check.yml`): every hour it looks for a store with 50+ orders that has no users or no products. If it finds one the run fails and GitHub emails the repository owner. You can also run it by hand from Actions.
+- **Database rule** (`store_data_protect.sql`, run once in Supabase): an update can no longer empty a store's users, wipe 20+ categories, or reset the store name.
+- **Product protection** (`delta_safety.sql`, in the njpos-pwa repo's docs/delta-sync.sql): the database refuses to remove most of a store's products at once, and devices keep products that were restored.
+- **App protections**: Switch Store downloads the new store first and changes nothing if it fails; a device remembers which store its data belongs to; a device whose product list looks lost re-downloads it instead of deleting the store's products.

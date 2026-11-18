@@ -1,0 +1,17 @@
+name: Store health check
+on:
+  schedule:
+    - cron: "17 * * * *"      # every hour
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Look for wiped stores (fails, and GitHub emails you, when one is found)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: ./scripts/store-health-check.sh
