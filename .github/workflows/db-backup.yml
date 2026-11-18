@@ -1,7 +1,7 @@
-name: Daily database backup
+name: Database backup (every 3 hours)
 on:
   schedule:
-    - cron: "30 19 * * *"        # 19:30 UTC = 3:30 AM Philippine time, when stores are closed
+    - cron: "5 */3 * * *"        # every 3 hours (UTC 00:05, 03:05, 06:05 ...)
   workflow_dispatch: {}           # lets you run it by hand from the Actions tab
 permissions:
   contents: read

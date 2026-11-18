@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Daily full backup of the POS database (public schema) into a private Supabase Storage bucket.
-# Needs: SUPABASE_DB_URL, SUPABASE_URL, SUPABASE_SERVICE_KEY   (see docs/db-backup.md). Optional: BACKUP_BUCKET (default db-backups), KEEP_DAYS (default 30)
+# Needs: SUPABASE_DB_URL, SUPABASE_URL, SUPABASE_SERVICE_KEY   (see docs/db-backup.md). Optional: BACKUP_BUCKET (default db-backups)
 set -euo pipefail
 : "${SUPABASE_DB_URL:?}" "${SUPABASE_URL:?}" "${SUPABASE_SERVICE_KEY:?}"
-BUCKET="${BACKUP_BUCKET:-db-backups}"; KEEP_DAYS="${KEEP_DAYS:-30}"; API="${SUPABASE_URL%/}/storage/v1"
+BUCKET="${BACKUP_BUCKET:-db-backups}"; API="${SUPABASE_URL%/}/storage/v1"
 # New-style keys (sb_secret_...) are not JWTs: they go in the apikey header only. Old service_role keys (JWTs) go in both.
 if [[ "$SUPABASE_SERVICE_KEY" == sb_* ]]; then auth=(-H "apikey: ${SUPABASE_SERVICE_KEY}")
 else auth=(-H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" -H "apikey: ${SUPABASE_SERVICE_KEY}"); fi
@@ -28,10 +28,10 @@ curl -fsS "${auth[@]}" -H "Content-Type: application/octet-stream" -H "x-upsert:
   --data-binary "@${file}" "$API/object/${BUCKET}/daily/${file}" > /dev/null
 echo "uploaded daily/${file}"
 
-# keep only the newest KEEP_DAYS days
-cutoff="$(date -u -d "-${KEEP_DAYS} days" +%Y-%m-%dT%H:%M:%S)"
+# keep every backup of the last 3 days, then the newest one of each day up to 30 days (see backup-prune.jq)
+here="$(cd "$(dirname "$0")" && pwd)"
 old=$(curl -fsS "${auth[@]}" -H "Content-Type: application/json" -X POST "$API/object/list/${BUCKET}" -d '{"prefix":"daily","limit":1000}' \
-  | jq -c --arg cutoff "$cutoff" '[.[] | select(.name|startswith("njpos-db-")) | select(.created_at < $cutoff) | "daily/" + .name]')
+  | jq -c --argjson now "$(date -u +%s)" -f "$here/backup-prune.jq")
 if [ "$old" != "[]" ]; then
   curl -fsS "${auth[@]}" -H "Content-Type: application/json" -X DELETE "$API/object/${BUCKET}" -d "{\"prefixes\":${old}}" > /dev/null
   echo "removed old backups: $old"

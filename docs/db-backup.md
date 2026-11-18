@@ -1,6 +1,6 @@
 # Daily database backup
 
-A GitHub job (`.github/workflows/db-backup.yml`) runs every day at 3:30 AM Philippine time. It copies the whole `public`
+A GitHub job (`.github/workflows/db-backup.yml`) runs every 3 hours (about 5 minutes past 00:00, 03:00, 06:00 ... UTC; GitHub can start it a few minutes late). It copies the whole `public`
 schema of the Supabase database into a compressed file and uploads it to a private Supabase Storage bucket. It does not touch the
 app and does not lock anything. GitHub emails the repository owner if a run fails.
 
@@ -44,3 +44,10 @@ The products are written through the same database function the app uses (`upser
 - **Database rule** (`store_data_protect.sql`, run once in Supabase): an update can no longer empty a store's users, wipe 20+ categories, or reset the store name.
 - **Product protection** (`delta_safety.sql`, in the njpos-pwa repo's docs/delta-sync.sql): the database refuses to remove most of a store's products at once, and devices keep products that were restored.
 - **App protections**: Switch Store downloads the new store first and changes nothing if it fails; a device remembers which store its data belongs to; a device whose product list looks lost re-downloads it instead of deleting the store's products.
+
+
+## Backup schedule and how long backups are kept
+- A backup is made every 3 hours. Every backup of the last 3 days is kept; after that only the newest backup of each day is kept, up to 30 days; older ones are deleted automatically (`scripts/backup-prune.jq`).
+- File names are in UTC: `njpos-db-YYYY-MM-DD_HHMM.dump`. Philippine time is UTC + 8 hours.
+- When restoring after a problem, pick the newest file from BEFORE the problem started (the restore workflows take the file name as an input; empty means "the newest", which may already contain the damage).
+- GitHub Actions minutes: a backup takes about a minute, so every 3 hours is about 240 minutes a month, plus about 720 for the hourly store health check. That fits the free 2,000 minutes of a private repository; if the repository is public there is no limit.
