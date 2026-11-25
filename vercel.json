@@ -36,10 +36,6 @@
     {
       "path": "/api/daily-report",
       "schedule": "*/30 * * * *"
-    },
-    {
-      "path": "/api/trigger-backup",
-      "schedule": "5 */3 * * *"
     }
   ]
 }
